@@ -29,6 +29,7 @@ import type { Metadata } from "next";
 
 interface PageProps {
 	params: Promise<{ name: string }>;
+	searchParams: Promise<{ provider?: string }>;
 }
 
 export default async function ModelPage({ params }: PageProps) {
@@ -347,9 +348,12 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({
 	params,
+	searchParams,
 }: PageProps): Promise<Metadata> {
 	const { name } = await params;
 	const decodedName = decodeURIComponent(name);
+	const { provider } = (await searchParams) ?? {};
+	const decodedProvider = provider ? decodeURIComponent(provider) : undefined;
 	const model = modelDefinitions.find((m) => m.id === decodedName) as
 		| ModelDefinition
 		| undefined;
@@ -363,7 +367,8 @@ export async function generateMetadata({
 		model.description ||
 		`Details, pricing, and capabilities for ${model.name || model.id} on LLM Gateway.`;
 
-	const primaryProvider = model.providers[0]?.providerId || "default";
+	const primaryProvider =
+		decodedProvider || model.providers[0]?.providerId || "default";
 	const ogImageUrl = `/api/og/${encodeURIComponent(decodedName)}/${encodeURIComponent(primaryProvider)}`;
 
 	return {

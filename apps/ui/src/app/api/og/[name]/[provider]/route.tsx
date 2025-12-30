@@ -139,25 +139,25 @@ export async function GET(
 			if (hasDiscount) {
 				const percentOff = Math.round(discountMultiplier * 100);
 				return (
-					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-						<div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+					<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+						<div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
 							<span
 								style={{
 									textDecoration: "line-through",
 									color: "#6B7280",
-									fontSize: 28,
+									fontSize: 36,
 								}}
 							>
 								{original}
 							</span>
-							<span style={{ fontWeight: 700, fontSize: 42 }}>
+							<span style={{ fontWeight: 700, fontSize: 56 }}>
 								{discounted}
 							</span>
 						</div>
 						<span
 							style={{
 								color: "#10B981",
-								fontSize: 18,
+								fontSize: 22,
 								fontWeight: 600,
 							}}
 						>
@@ -166,7 +166,7 @@ export async function GET(
 					</div>
 				);
 			}
-			return <span style={{ fontWeight: 700, fontSize: 42 }}>{original}</span>;
+			return <span style={{ fontWeight: 700, fontSize: 56 }}>{original}</span>;
 		};
 
 		return new ImageResponse(
@@ -205,9 +205,9 @@ export async function GET(
 						>
 							<div
 								style={{
-									width: 64,
-									height: 64,
-									borderRadius: 16,
+									width: 88,
+									height: 88,
+									borderRadius: 20,
 									backgroundColor: "#111827",
 									border: "2px solid rgba(148,163,184,0.3)",
 									display: "flex",
@@ -217,11 +217,11 @@ export async function GET(
 								}}
 							>
 								{ProviderIcon ? (
-									<ProviderIcon width={40} height={40} />
+									<ProviderIcon width={56} height={56} />
 								) : (
 									<span
 										style={{
-											fontSize: 28,
+											fontSize: 36,
 											fontWeight: 700,
 										}}
 									>
@@ -239,12 +239,12 @@ export async function GET(
 								style={{
 									display: "flex",
 									flexDirection: "column",
-									gap: 4,
+									gap: 6,
 								}}
 							>
 								<span
 									style={{
-										fontSize: 36,
+										fontSize: 52,
 										fontWeight: 700,
 										letterSpacing: "-0.02em",
 									}}
@@ -256,8 +256,8 @@ export async function GET(
 										display: "flex",
 										flexDirection: "row",
 										alignItems: "center",
-										gap: 8,
-										fontSize: 18,
+										gap: 10,
+										fontSize: 24,
 										color: "#9CA3AF",
 									}}
 								>
@@ -283,9 +283,9 @@ export async function GET(
 									<div
 										key={id}
 										style={{
-											width: 36,
-											height: 36,
-											borderRadius: 10,
+											width: 48,
+											height: 48,
+											borderRadius: 12,
 											backgroundColor: "#111827",
 											border: "1px solid rgba(148,163,184,0.3)",
 											display: "flex",
@@ -294,7 +294,7 @@ export async function GET(
 											overflow: "hidden",
 										}}
 									>
-										<Icon width={22} height={22} />
+										<Icon width={30} height={30} />
 									</div>
 								))}
 							</div>
@@ -306,13 +306,13 @@ export async function GET(
 						style={{
 							display: "flex",
 							flexDirection: "column",
-							gap: 24,
+							gap: 28,
 						}}
 					>
 						<span
 							style={{
 								color: "#6B7280",
-								fontSize: 20,
+								fontSize: 24,
 								fontWeight: 500,
 								textTransform: "uppercase",
 								letterSpacing: "0.1em",
@@ -324,7 +324,7 @@ export async function GET(
 							style={{
 								display: "flex",
 								flexDirection: "row",
-								gap: 48,
+								gap: 32,
 							}}
 						>
 							{/* Context */}
@@ -332,17 +332,17 @@ export async function GET(
 								style={{
 									display: "flex",
 									flexDirection: "column",
-									gap: 8,
-									padding: "24px 32px",
+									gap: 10,
+									padding: "28px 36px",
 									backgroundColor: "#0A0A0A",
-									borderRadius: 16,
+									borderRadius: 20,
 									border: "1px solid #1F2937",
 								}}
 							>
 								<span
 									style={{
 										color: "#9CA3AF",
-										fontSize: 16,
+										fontSize: 20,
 										fontWeight: 500,
 										textTransform: "uppercase",
 										letterSpacing: "0.05em",
@@ -350,7 +350,7 @@ export async function GET(
 								>
 									Context
 								</span>
-								<span style={{ fontSize: 42, fontWeight: 700 }}>
+								<span style={{ fontSize: 56, fontWeight: 700 }}>
 									{contextSize ? formatContextSize(contextSize) : "—"}
 								</span>
 							</div>
@@ -360,17 +360,17 @@ export async function GET(
 								style={{
 									display: "flex",
 									flexDirection: "column",
-									gap: 8,
-									padding: "24px 32px",
+									gap: 10,
+									padding: "28px 36px",
 									backgroundColor: "#0A0A0A",
-									borderRadius: 16,
+									borderRadius: 20,
 									border: "1px solid #1F2937",
 								}}
 							>
 								<span
 									style={{
 										color: "#9CA3AF",
-										fontSize: 16,
+										fontSize: 20,
 										fontWeight: 500,
 										textTransform: "uppercase",
 										letterSpacing: "0.05em",
@@ -389,17 +389,17 @@ export async function GET(
 								style={{
 									display: "flex",
 									flexDirection: "column",
-									gap: 8,
-									padding: "24px 32px",
+									gap: 10,
+									padding: "28px 36px",
 									backgroundColor: "#0A0A0A",
-									borderRadius: 16,
+									borderRadius: 20,
 									border: "1px solid #1F2937",
 								}}
 							>
 								<span
 									style={{
 										color: "#9CA3AF",
-										fontSize: 16,
+										fontSize: 20,
 										fontWeight: 500,
 										textTransform: "uppercase",
 										letterSpacing: "0.05em",
@@ -409,35 +409,6 @@ export async function GET(
 								</span>
 								{formatDollars(
 									pricing?.output || undefined,
-									selectedMapping?.discount,
-								)}
-							</div>
-
-							{/* Cached */}
-							<div
-								style={{
-									display: "flex",
-									flexDirection: "column",
-									gap: 8,
-									padding: "24px 32px",
-									backgroundColor: "#0A0A0A",
-									borderRadius: 16,
-									border: "1px solid #1F2937",
-								}}
-							>
-								<span
-									style={{
-										color: "#9CA3AF",
-										fontSize: 16,
-										fontWeight: 500,
-										textTransform: "uppercase",
-										letterSpacing: "0.05em",
-									}}
-								>
-									Cache
-								</span>
-								{formatDollars(
-									pricing?.cachedInput || undefined,
 									selectedMapping?.discount,
 								)}
 							</div>
@@ -458,24 +429,24 @@ export async function GET(
 								display: "flex",
 								flexDirection: "row",
 								alignItems: "center",
-								gap: 12,
+								gap: 14,
 							}}
 						>
 							<div
 								style={{
-									width: 32,
-									height: 32,
+									width: 44,
+									height: 44,
 									display: "flex",
 									alignItems: "center",
 									justifyContent: "center",
 									color: "#ffffff",
 								}}
 							>
-								<Logo style={{ width: 28, height: 28 }} />
+								<Logo style={{ width: 40, height: 40 }} />
 							</div>
 							<span
 								style={{
-									fontSize: 20,
+									fontSize: 26,
 									fontWeight: 600,
 									color: "#E5E7EB",
 								}}
@@ -485,7 +456,7 @@ export async function GET(
 						</div>
 						<span
 							style={{
-								fontSize: 18,
+								fontSize: 24,
 								color: "#6B7280",
 							}}
 						>
