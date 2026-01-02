@@ -160,6 +160,11 @@ export interface ProviderModelMapping {
 	 * Date when the model mapping will be deactivated (returns error when requested)
 	 */
 	deactivatedAt?: Date;
+	/**
+	 * Whether this model uses a dedicated image generation API.
+	 * When true, requests are routed to a provider-specific image generation endpoint.
+	 */
+	imageGenerations?: boolean;
 }
 
 export type StabilityLevel = "stable" | "beta" | "unstable" | "experimental";

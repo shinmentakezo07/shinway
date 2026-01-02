@@ -61,6 +61,7 @@ import { transformStreamingToOpenai } from "./tools/transform-streaming-to-opena
 import { type ChatMessage, DEFAULT_TOKENIZER_MODEL } from "./tools/types.js";
 import { validateFreeModelUsage } from "./tools/validate-free-model-usage.js";
 
+import type { ImageObject } from "./tools/types.js";
 import type { ServerTypes } from "@/vars.js";
 
 /**
@@ -68,6 +69,52 @@ import type { ServerTypes } from "@/vars.js";
  */
 export function estimateTokensFromContent(content: string): number {
 	return Math.max(1, Math.round(content.length / 4));
+}
+
+/**
+ * Converts external image URLs to base64 data URLs
+ * Used for providers like Alibaba that return external URLs instead of base64
+ */
+async function convertImagesToBase64(
+	images: ImageObject[],
+): Promise<ImageObject[]> {
+	return await Promise.all(
+		images.map(async (image): Promise<ImageObject> => {
+			const url = image.image_url.url;
+			// Skip if already a data URL
+			if (url.startsWith("data:")) {
+				return image;
+			}
+
+			try {
+				const response = await fetch(url);
+				if (!response.ok) {
+					logger.warn("Failed to fetch image for base64 conversion", {
+						url,
+						status: response.status,
+					});
+					return image;
+				}
+
+				const contentType = response.headers.get("content-type") || "image/png";
+				const arrayBuffer = await response.arrayBuffer();
+				const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+				return {
+					type: "image_url",
+					image_url: {
+						url: `data:${contentType};base64,${base64}`,
+					},
+				};
+			} catch (error) {
+				logger.warn("Error converting image to base64", {
+					url,
+					error: error instanceof Error ? error.message : String(error),
+				});
+				return image;
+			}
+		}),
+	);
 }
 
 export const chat = new OpenAPIHono<ServerTypes>();
@@ -250,11 +297,13 @@ const completionsRequestSchema = z.object({
 			status: z.enum(["DISABLE", "ENABLE"]),
 		})
 		.optional(),
-	// Google image generation config
+	// Image generation config (Google and Alibaba)
 	image_config: z
 		.object({
 			aspect_ratio: z.string().optional(),
 			image_size: z.string().optional(),
+			n: z.number().optional(),
+			seed: z.number().optional(),
 		})
 		.optional(),
 });
@@ -1471,6 +1520,14 @@ chat.openapi(completions, async (c) => {
 
 	const baseModelName = finalModelInfo?.id || usedModel;
 
+	// Check if this is an image generation model
+	const imageGenProviderMapping = finalModelInfo?.providers.find(
+		(p) => p.providerId === usedProvider && p.modelName === usedModel,
+	);
+	const isImageGeneration =
+		(imageGenProviderMapping as ProviderModelMapping)?.imageGenerations ===
+		true;
+
 	// Create the model mapping values according to new schema
 	const usedModelMapping = usedModel; // Store the original provider model name
 	const usedModelFormatted = `${usedProvider}/${baseModelName}`; // Store in LLMGateway format
@@ -1775,6 +1832,7 @@ chat.openapi(completions, async (c) => {
 			hasExistingToolCalls,
 			providerKey?.options || undefined,
 			configIndex,
+			isImageGeneration,
 		);
 	} catch (error) {
 		if (usedProvider === "llmgateway" && usedModel !== "custom") {
@@ -2112,8 +2170,15 @@ chat.openapi(completions, async (c) => {
 	}
 
 	// Check if streaming is requested and if the model/provider combination supports it
+	// For image generation models, we'll fake streaming by converting the response
+	const fakeStreamingForImageGen = stream && isImageGeneration;
+	const effectiveStream = fakeStreamingForImageGen ? false : stream;
+
 	if (stream) {
-		if (getModelStreamingSupport(baseModelName, usedProvider) === false) {
+		if (
+			!isImageGeneration &&
+			getModelStreamingSupport(baseModelName, usedProvider) === false
+		) {
 			throw new HTTPException(400, {
 				message: `Model ${usedModel} with provider ${usedProvider} does not support streaming`,
 			});
@@ -2182,7 +2247,7 @@ chat.openapi(completions, async (c) => {
 		usedProvider,
 		usedModel,
 		messages as BaseMessage[],
-		stream,
+		effectiveStream,
 		temperature,
 		max_tokens,
 		top_p,
@@ -2199,6 +2264,7 @@ chat.openapi(completions, async (c) => {
 		sensitive_word_check,
 		image_config,
 		effort,
+		isImageGeneration,
 	);
 
 	// Validate effective max_tokens value after prepareRequestBody
@@ -2227,7 +2293,8 @@ chat.openapi(completions, async (c) => {
 	const startTime = Date.now();
 
 	// Handle streaming response if requested
-	if (stream) {
+	// For image generation models, we skip real streaming and use fake streaming later
+	if (effectiveStream) {
 		return streamSSE(c, async (stream) => {
 			let eventId = 0;
 			let canceled = false;
@@ -4197,6 +4264,17 @@ chat.openapi(completions, async (c) => {
 	logger.debug("Gateway - Used provider", { usedProvider });
 	logger.debug("Gateway - Used model", { usedModel });
 
+	// Convert external image URLs to base64 data URLs for Alibaba
+	// This ensures consistent response format across all providers
+	let convertedImages = images;
+	if (usedProvider === "alibaba" && images && images.length > 0) {
+		convertedImages = await convertImagesToBase64(images);
+		logger.debug("Gateway - Converted Alibaba images to base64", {
+			originalCount: images.length,
+			convertedCount: convertedImages.length,
+		});
+	}
+
 	// Estimate tokens if not provided by the API
 	const { calculatedPromptTokens, calculatedCompletionTokens } = estimateTokens(
 		usedProvider,
@@ -4232,7 +4310,7 @@ chat.openapi(completions, async (c) => {
 			toolResults: toolResults,
 		},
 		reasoningTokens,
-		images?.length || 0,
+		convertedImages?.length || 0,
 		image_config?.image_size,
 		inputImageCount,
 	);
@@ -4256,7 +4334,7 @@ chat.openapi(completions, async (c) => {
 		reasoningTokens,
 		cachedTokens,
 		toolResults,
-		images,
+		convertedImages,
 		modelInput,
 		requestedProvider || null,
 		baseModelName,
@@ -4395,6 +4473,64 @@ chat.openapi(completions, async (c) => {
 
 	if (cachingEnabled && cacheKey && !stream && !hasEmptyNonStreamingResponse) {
 		await setCache(cacheKey, transformedResponse, cacheDuration);
+	}
+
+	// For image generation models with streaming requested, convert to SSE format
+	if (fakeStreamingForImageGen) {
+		const streamChunks: string[] = [];
+
+		// Create a streaming chunk that mimics OpenAI SSE format
+		const deltaChunk = {
+			id: transformedResponse.id || `chatcmpl-${Date.now()}`,
+			object: "chat.completion.chunk",
+			created: transformedResponse.created || Math.floor(Date.now() / 1000),
+			model: transformedResponse.model,
+			choices: [
+				{
+					index: 0,
+					delta: {
+						role: "assistant",
+						content: transformedResponse.choices?.[0]?.message?.content || "",
+						...(transformedResponse.choices?.[0]?.message?.images && {
+							images: transformedResponse.choices[0].message.images,
+						}),
+					},
+					finish_reason: null,
+				},
+			],
+		};
+		streamChunks.push(`data: ${JSON.stringify(deltaChunk)}\n\n`);
+
+		// Send finish chunk
+		const finishChunk = {
+			id: transformedResponse.id || `chatcmpl-${Date.now()}`,
+			object: "chat.completion.chunk",
+			created: transformedResponse.created || Math.floor(Date.now() / 1000),
+			model: transformedResponse.model,
+			choices: [
+				{
+					index: 0,
+					delta: {},
+					finish_reason:
+						transformedResponse.choices?.[0]?.finish_reason || "stop",
+				},
+			],
+			...(transformedResponse.usage && { usage: transformedResponse.usage }),
+			...(transformedResponse.metadata && {
+				metadata: transformedResponse.metadata,
+			}),
+		};
+		streamChunks.push(`data: ${JSON.stringify(finishChunk)}\n\n`);
+		streamChunks.push("data: [DONE]\n\n");
+
+		return new Response(streamChunks.join(""), {
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"X-Request-Id": requestId,
+			},
+		});
 	}
 
 	return c.json(transformedResponse);

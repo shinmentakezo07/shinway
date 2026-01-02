@@ -141,9 +141,62 @@ export async function prepareRequestBody(
 	maxImageSizeMB = 20,
 	userPlan: "free" | "pro" | null = null,
 	sensitive_word_check?: { status: "DISABLE" | "ENABLE" },
-	image_config?: { aspect_ratio?: string; image_size?: string },
+	image_config?: {
+		aspect_ratio?: string;
+		image_size?: string;
+		n?: number;
+		seed?: number;
+	},
 	effort?: "low" | "medium" | "high",
+	imageGenerations?: boolean,
 ): Promise<ProviderRequestBody> {
+	// Handle Alibaba image generation models
+	if (imageGenerations && usedProvider === "alibaba") {
+		// Extract prompt from last user message
+		const lastUserMessage = [...messages]
+			.reverse()
+			.find((m) => m.role === "user");
+		let prompt = "";
+		if (lastUserMessage) {
+			if (typeof lastUserMessage.content === "string") {
+				prompt = lastUserMessage.content;
+			} else if (Array.isArray(lastUserMessage.content)) {
+				prompt = lastUserMessage.content
+					.filter((p): p is { type: "text"; text: string } => p.type === "text")
+					.map((p) => p.text)
+					.join("\n");
+			}
+		}
+
+		// Alibaba DashScope multimodal generation format
+		const alibabaImageRequest: any = {
+			model: usedModel,
+			input: {
+				messages: [
+					{
+						role: "user",
+						content: [{ text: prompt }],
+					},
+				],
+			},
+			parameters: {
+				watermark: false,
+				...(image_config?.n && { n: image_config.n }),
+				...(image_config?.seed !== undefined && { seed: image_config.seed }),
+			},
+		};
+
+		// Map image_size to Alibaba format (uses * instead of x)
+		if (image_config?.image_size) {
+			alibabaImageRequest.parameters.size = image_config.image_size.replace(
+				"x",
+				"*",
+			);
+		}
+
+		return alibabaImageRequest;
+	}
+
 	// Check if the model supports system role
 	const modelDef = models.find((m) => m.id === usedModel);
 	const supportsSystemRole =

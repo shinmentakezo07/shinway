@@ -17,6 +17,7 @@ export function getProviderEndpoint(
 	hasExistingToolCalls?: boolean,
 	providerKeyOptions?: ProviderKeyOptions,
 	configIndex?: number,
+	imageGenerations?: boolean,
 ): string {
 	let modelName = model;
 	if (model && model !== "custom") {
@@ -90,7 +91,12 @@ export function getProviderEndpoint(
 				url = "https://api.moonshot.ai";
 				break;
 			case "alibaba":
-				url = "https://dashscope-intl.aliyuncs.com/compatible-mode";
+				// Use different base URL for image generation vs chat completions
+				if (imageGenerations) {
+					url = "https://dashscope-intl.aliyuncs.com";
+				} else {
+					url = "https://dashscope-intl.aliyuncs.com/compatible-mode";
+				}
 				break;
 			case "nebius":
 				url = "https://api.studio.nebius.com";
@@ -272,6 +278,11 @@ export function getProviderEndpoint(
 			}
 			return `${url}/v1/chat/completions`;
 		}
+		case "alibaba":
+			if (imageGenerations) {
+				return `${url}/api/v1/services/aigc/multimodal-generation/generation`;
+			}
+			return `${url}/v1/chat/completions`;
 		case "inference.net":
 		case "llmgateway":
 		case "cloudrift":
@@ -280,7 +291,6 @@ export function getProviderEndpoint(
 		case "cerebras":
 		case "deepseek":
 		case "moonshot":
-		case "alibaba":
 		case "nebius":
 		case "routeway":
 		case "nanogpt":

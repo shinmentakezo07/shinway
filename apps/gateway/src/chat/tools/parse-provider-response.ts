@@ -336,6 +336,64 @@ export function parseProviderResponse(
 			toolResults = json.choices?.[0]?.message?.tool_calls || null;
 			break;
 		}
+		case "alibaba": {
+			// Check if this is a DashScope multimodal generation response (image generation)
+			// Format: { output: { choices: [{ message: { content: [{ image: "url" }] } }] }, usage: {...} }
+			const alibabaChoices = json.output?.choices;
+			if (alibabaChoices && Array.isArray(alibabaChoices)) {
+				const messageContent = alibabaChoices[0]?.message?.content;
+				if (Array.isArray(messageContent)) {
+					// Extract images from content array
+					const imageItems = messageContent.filter((item: any) => item.image);
+					if (imageItems.length > 0) {
+						images = imageItems.map(
+							(item: any): ImageObject => ({
+								type: "image_url",
+								image_url: {
+									url: item.image,
+								},
+							}),
+						);
+						content = "Generated image";
+						finishReason = alibabaChoices[0]?.finish_reason || "stop";
+						// DashScope image generation uses different usage format
+						promptTokens = 0;
+						completionTokens = 0;
+						totalTokens = 0;
+					} else {
+						// Text content in DashScope format
+						content =
+							messageContent
+								.filter((item: any) => item.text)
+								.map((item: any) => item.text)
+								.join("") || null;
+						finishReason = alibabaChoices[0]?.finish_reason || null;
+					}
+				}
+			} else if (json.choices) {
+				// Alibaba chat completions use OpenAI format
+				toolResults = json.choices?.[0]?.message?.tool_calls || null;
+				content = json.choices?.[0]?.message?.content || null;
+				reasoningContent =
+					json.choices?.[0]?.message?.reasoning ||
+					json.choices?.[0]?.message?.reasoning_content ||
+					null;
+				finishReason = json.choices?.[0]?.finish_reason || null;
+				promptTokens = json.usage?.prompt_tokens || null;
+				completionTokens = json.usage?.completion_tokens || null;
+				reasoningTokens = json.usage?.reasoning_tokens || null;
+				cachedTokens = json.usage?.prompt_tokens_details?.cached_tokens || null;
+				totalTokens =
+					json.usage?.total_tokens ||
+					(promptTokens !== null && completionTokens !== null
+						? promptTokens + completionTokens + (reasoningTokens || 0)
+						: null);
+				if (json.choices?.[0]?.message?.images) {
+					images = json.choices[0].message.images;
+				}
+			}
+			break;
+		}
 		default: // OpenAI format
 			// Check if this is an OpenAI responses format (has output array instead of choices)
 			if (json.output && Array.isArray(json.output)) {
