@@ -6,7 +6,7 @@ import { Loader2, KeySquare } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod/v3";
@@ -42,7 +42,7 @@ function getSafeRedirectUrl(url: string | null): string {
 	return "/dashboard";
 }
 
-export default function Login() {
+function LoginForm() {
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -250,5 +250,19 @@ export default function Login() {
 				</p>
 			</div>
 		</div>
+	);
+}
+
+export default function Login() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen flex items-center justify-center">
+					<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+				</div>
+			}
+		>
+			<LoginForm />
+		</Suspense>
 	);
 }

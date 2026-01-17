@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod/v3";
@@ -43,7 +43,7 @@ function getSafeRedirectUrl(url: string | null): string {
 	return "/dashboard";
 }
 
-export default function Signup() {
+function SignupForm() {
 	const searchParams = useSearchParams();
 	const queryClient = useQueryClient();
 	const router = useRouter();
@@ -207,5 +207,19 @@ export default function Signup() {
 				</p>
 			</div>
 		</div>
+	);
+}
+
+export default function Signup() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen flex items-center justify-center">
+					<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+				</div>
+			}
+		>
+			<SignupForm />
+		</Suspense>
 	);
 }
