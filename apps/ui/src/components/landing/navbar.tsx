@@ -231,28 +231,19 @@ export const Navbar = ({
 											<ul className="grid gap-3 p-6 md:w-[480px] lg:w-[640px] lg:grid-cols-[.8fr_1fr]">
 												<li className="row-span-3">
 													<NavigationMenuLink asChild>
-														<a
-															className="flex h-full w-full select-none flex-col justify-end rounded-md bg-linear-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
-															href={
-																config.docsUrl
-																	? `${config.docsUrl}/quick-start`
-																	: "#"
-															}
-															target={config.docsUrl ? "_blank" : undefined}
-															rel={
-																config.docsUrl
-																	? "noopener noreferrer"
-																	: undefined
-															}
+														<Link
+															href="/enterprise"
+															prefetch={true}
+															className="group/enterprise flex h-full w-full select-none flex-col justify-end rounded-md bg-linear-to-b from-muted/50 to-muted p-6 no-underline outline-none transition-all duration-300 focus:shadow-md hover:from-blue-500/20 hover:to-blue-600/30 hover:shadow-lg hover:shadow-blue-500/10"
 														>
-															<div className="mb-2 mt-4 text-lg font-medium">
-																Quick Start
+															<div className="mb-2 mt-4 text-lg font-medium group-hover/enterprise:text-blue-500 dark:group-hover/enterprise:text-blue-400 transition-colors">
+																Enterprise
 															</div>
 															<p className="text-sm leading-tight text-muted-foreground">
-																Get started in minutes. Install, configure
-																providers, and call the API.
+																Advanced features for teams. Custom billing,
+																extended retention, and priority support.
 															</p>
-														</a>
+														</Link>
 													</NavigationMenuLink>
 												</li>
 												{resourcesLinks.map((link) => (
