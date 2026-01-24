@@ -1,19 +1,9 @@
 {
 	"branches": ["main"],
 	"tagFormat": "@llmgateway/models@${version}",
+	"extends": "semantic-release-monorepo",
 	"plugins": [
-		[
-			"@semantic-release/commit-analyzer",
-			{
-				"preset": "angular",
-				"releaseRules": [
-					{ "type": "feat", "release": "minor" },
-					{ "type": "fix", "release": "patch" },
-					{ "type": "perf", "release": "patch" },
-					{ "type": "refactor", "release": "patch" }
-				]
-			}
-		],
+		"@semantic-release/commit-analyzer",
 		"@semantic-release/release-notes-generator",
 		[
 			"@semantic-release/exec",

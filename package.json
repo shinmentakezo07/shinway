@@ -55,6 +55,7 @@
 		"prettier": "^3.6.2",
 		"resolve-tspaths": "0.8.23",
 		"semantic-release": "^24.2.5",
+		"semantic-release-monorepo": "8.0.2",
 		"sort-package-json": "3.4.0",
 		"sql.js": "1.13.0",
 		"tsc-watch": "7.2.0",
