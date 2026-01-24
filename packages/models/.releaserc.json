@@ -16,15 +16,9 @@
 		],
 		"@semantic-release/release-notes-generator",
 		[
-			"@semantic-release/npm",
-			{
-				"npmPublish": false,
-				"pkgRoot": "."
-			}
-		],
-		[
 			"@semantic-release/exec",
 			{
+				"prepareCmd": "npm pkg set version=${nextRelease.version}",
 				"publishCmd": "npm publish --provenance --access public"
 			}
 		]
