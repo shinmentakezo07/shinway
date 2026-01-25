@@ -121,6 +121,8 @@ NOTE: these commands can only be run in the root directory of the repository, no
 - For reads: Use `db().query.<table>.findMany()` or `db().query.<table>.findFirst()`
 - For schema changes: Use `pnpm run setup` instead of writing migrations which will generate .sql files
 - Always sync schema with `pnpm run setup` after table/column changes
+- Never write migrations manually, only edit generated migration files if specifically asked
+- When resolving migration conflicts, never resolve them manually. Instead, run `git restore --source=origin/main packages/db/migrations/` to reset them and then run `pnpm migrations` to regenerate migrations automatically
 
 ### Creating New Packages
 
