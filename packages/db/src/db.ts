@@ -18,6 +18,8 @@ export const pool = new Pool({
 	connectionTimeoutMillis:
 		Number(process.env.DATABASE_CONNECTION_TIMEOUT_MS) || 10000, // Fail fast if can't connect in 10s
 	allowExitOnIdle: true, // Allow process to exit if pool is idle
+	keepAlive: true,
+	keepAliveInitialDelayMillis: 10000, // Start sending keepalive probes after 10s of idle
 });
 
 // Log pool errors to help diagnose connection issues
