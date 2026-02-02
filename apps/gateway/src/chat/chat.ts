@@ -1338,8 +1338,12 @@ chat.openapi(completions, async (c) => {
 	// Use the canonical model ID from modelInfo (set before any routing/fallback)
 	// This ensures correct stats tracking when low-uptime fallback changes the provider
 	// Fall back to finalModelInfo.id or usedModel for edge cases like custom providers
+	// Skip modelInfo.id when it's "auto" since that's a routing pseudo-model, not the actual model
+	const modelInfoId = (modelInfo as ModelDefinition)?.id;
 	const baseModelName =
-		(modelInfo as ModelDefinition)?.id || finalModelInfo?.id || usedModel;
+		(modelInfoId && modelInfoId !== "auto" ? modelInfoId : null) ||
+		finalModelInfo?.id ||
+		usedModel;
 
 	// Check if this is an image generation model
 	const imageGenProviderMapping = finalModelInfo?.providers.find(
