@@ -11,6 +11,7 @@ import type { Provider } from "@llmgateway/models";
  */
 export function parseProviderResponse(
 	usedProvider: Provider,
+	usedModel: string,
 	json: any,
 	messages: any[] = [],
 ) {
@@ -180,23 +181,17 @@ export function parseProviderResponse(
 		case "google-ai-studio":
 		case "google-vertex":
 		case "obsidian": {
-			// Debug logging at the start to capture raw response structure
-			// Only log as error if there's no promptFeedback explaining why candidates are missing
-			if (
-				(!json.candidates || json.candidates.length === 0) &&
-				!json.promptFeedback?.blockReason
-			) {
-				logger.error(
+			// Check if response is missing candidates - treat as content filter
+			if (!json.candidates || json.candidates.length === 0) {
+				logger.warn(
 					"[parse-provider-response] Google response missing candidates",
 					{
-						hasCandidates: !!json.candidates,
-						candidatesLength: json.candidates?.length || 0,
-						hasPromptFeedback: !!json.promptFeedback,
-						promptBlockReason: json.promptFeedback?.blockReason,
-						responseKeys: Object.keys(json),
-						fullResponse: JSON.stringify(json, null, 2),
+						usedProvider,
+						usedModel,
+						fullResponse: json,
 					},
 				);
+				finishReason = "content_filter";
 			}
 
 			// Extract content and reasoning content from Google response parts
@@ -284,28 +279,13 @@ export function parseProviderResponse(
 
 			// Preserve the original Google finish reason for logging
 			// Use promptBlockReason if present, otherwise use googleFinishReason
-			if (promptBlockReason) {
-				finishReason = promptBlockReason;
-			} else if (googleFinishReason) {
-				finishReason = googleFinishReason;
-			} else {
-				finishReason = null;
-			}
-
-			// Debug logging for finish reason mapping
+			// Don't overwrite if already set (e.g., content_filter for missing candidates)
 			if (!finishReason) {
-				logger.error(
-					"[parse-provider-response] Google response missing finish reason",
-					{
-						promptBlockReason,
-						googleFinishReason,
-						candidateFinishReason: json.candidates?.[0]?.finishReason,
-						hasPromptFeedback: !!json.promptFeedback,
-						candidateKeys: json.candidates?.[0]
-							? Object.keys(json.candidates[0])
-							: [],
-					},
-				);
+				if (promptBlockReason) {
+					finishReason = promptBlockReason;
+				} else if (googleFinishReason) {
+					finishReason = googleFinishReason;
+				}
 			}
 
 			// Extract web search citations from Google grounding metadata
