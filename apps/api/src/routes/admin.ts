@@ -84,6 +84,7 @@ const orgMetricsSchema = z.object({
 	mostUsedModel: z.string().nullable(),
 	mostUsedProvider: z.string().nullable(),
 	mostUsedModelCost: z.number(),
+	discountSavings: z.number(),
 });
 
 const transactionSchema = z.object({
@@ -485,6 +486,7 @@ admin.openapi(getOrganizationMetrics, async (c) => {
 	let outputCost = 0;
 	let cachedTokens = 0;
 	let cachedCost = 0;
+	let discountSavings = 0;
 	let mostUsedModel: string | null = null;
 	let mostUsedProvider: string | null = null;
 	let mostUsedModelCost = 0;
@@ -524,6 +526,10 @@ admin.openapi(getOrganizationMetrics, async (c) => {
 					sql<number>`COALESCE(SUM(${projectHourlyStats.outputCost}), 0)`.as(
 						"outputCost",
 					),
+				discountSavings:
+					sql<number>`COALESCE(SUM(${projectHourlyStats.discountSavings}), 0)`.as(
+						"discountSavings",
+					),
 			})
 			.from(projectHourlyStats)
 			.where(
@@ -545,6 +551,7 @@ admin.openapi(getOrganizationMetrics, async (c) => {
 			cachedTokens = Number(totals.cachedTokens) || 0;
 			// cachedCost is not stored in aggregation tables, estimate from cachedTokens
 			cachedCost = 0;
+			discountSavings = Number(totals.discountSavings) || 0;
 		}
 
 		// Query model stats for most used model (by cost)
@@ -606,6 +613,7 @@ admin.openapi(getOrganizationMetrics, async (c) => {
 		mostUsedModel,
 		mostUsedProvider,
 		mostUsedModelCost,
+		discountSavings,
 	});
 });
 

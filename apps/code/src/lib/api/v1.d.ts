@@ -1164,6 +1164,7 @@ export interface paths {
                             mostUsedModel: string | null;
                             mostUsedProvider: string | null;
                             mostUsedModelCost: number;
+                            discountSavings: number;
                         };
                     };
                 };

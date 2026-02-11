@@ -51,6 +51,7 @@ export interface OrganizationMetrics {
 	mostUsedModel: string | null;
 	mostUsedProvider: string | null;
 	mostUsedModelCost: number;
+	discountSavings: number;
 }
 
 export interface Transaction {

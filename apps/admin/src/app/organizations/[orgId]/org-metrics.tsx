@@ -6,6 +6,7 @@ import {
 	Hash,
 	Loader2,
 	Server,
+	TrendingDown,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -237,6 +238,13 @@ export function OrgMetricsSection({ orgId }: { orgId: string }) {
 					subtitle="Sum of metered usage costs (USD)"
 					icon={<CircleDollarSign className="h-4 w-4" />}
 					accent="purple"
+				/>
+				<MetricCard
+					label="Total Savings"
+					value={currencyFormatter.format(safeNumber(metrics.discountSavings))}
+					subtitle="Discount savings from applied discounts"
+					icon={<TrendingDown className="h-4 w-4" />}
+					accent="green"
 				/>
 				<MetricCard
 					label="Input Tokens & Cost"
