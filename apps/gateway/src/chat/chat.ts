@@ -1480,6 +1480,8 @@ chat.openapi(completions, async (c) => {
 		});
 	}
 
+	const useResponsesApi = url?.includes("/responses") ?? false;
+
 	if (!url) {
 		throw new HTTPException(400, {
 			message: `No base URL set for provider: ${usedProvider}. Please add a base URL in your settings.`,
@@ -2028,6 +2030,7 @@ chat.openapi(completions, async (c) => {
 		effort,
 		isImageGeneration,
 		webSearchTool,
+		useResponsesApi,
 	);
 
 	// Validate effective max_tokens value after prepareRequestBody
