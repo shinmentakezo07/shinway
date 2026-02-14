@@ -97,7 +97,10 @@ export function TemplateCards() {
 	const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
 	const copyToClipboard = useCallback((url: string) => {
-		navigator.clipboard.writeText(`git clone ${url}`);
+		const repoPath = url
+			.replace("https://github.com/", "")
+			.replace("/tree/main/", "/");
+		navigator.clipboard.writeText(`npx degit ${repoPath}`);
 		setCopiedUrl(url);
 		setTimeout(() => setCopiedUrl(null), 2000);
 	}, []);
