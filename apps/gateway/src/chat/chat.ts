@@ -1391,6 +1391,7 @@ chat.openapi(completions, async (c) => {
 
 		if (
 			totalAvailableCredits <= 0 &&
+			!free_models_only &&
 			!((finalModelInfo ?? modelInfo) as ModelDefinition).free
 		) {
 			if (organization.devPlan !== "none" && devPlanCreditsRemaining <= 0) {
@@ -1436,6 +1437,7 @@ chat.openapi(completions, async (c) => {
 
 			if (
 				totalAvailableCredits <= 0 &&
+				!free_models_only &&
 				!isModelTrulyFree((finalModelInfo ?? modelInfo) as ModelDefinition)
 			) {
 				if (organization.devPlan !== "none" && devPlanCreditsRemaining <= 0) {
