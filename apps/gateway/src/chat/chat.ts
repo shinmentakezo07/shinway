@@ -1388,7 +1388,10 @@ chat.openapi(completions, async (c) => {
 				: 0;
 		const totalAvailableCredits = regularCredits + devPlanCreditsRemaining;
 
-		if (totalAvailableCredits <= 0 && !(modelInfo as ModelDefinition).free) {
+		if (
+			totalAvailableCredits <= 0 &&
+			!((finalModelInfo ?? modelInfo) as ModelDefinition).free
+		) {
 			if (organization.devPlan !== "none" && devPlanCreditsRemaining <= 0) {
 				const renewalDate = organization.devPlanExpiresAt
 					? new Date(organization.devPlanExpiresAt).toLocaleDateString()
@@ -1432,7 +1435,7 @@ chat.openapi(completions, async (c) => {
 
 			if (
 				totalAvailableCredits <= 0 &&
-				!isModelTrulyFree(modelInfo as ModelDefinition)
+				!isModelTrulyFree((finalModelInfo ?? modelInfo) as ModelDefinition)
 			) {
 				if (organization.devPlan !== "none" && devPlanCreditsRemaining <= 0) {
 					const renewalDate = organization.devPlanExpiresAt
@@ -1461,7 +1464,7 @@ chat.openapi(completions, async (c) => {
 
 	// Check email verification and rate limits for free models (only when using credits/environment tokens)
 	if (
-		isModelTrulyFree(modelInfo as ModelDefinition) &&
+		isModelTrulyFree((finalModelInfo ?? modelInfo) as ModelDefinition) &&
 		(!providerKey || !providerKey.token)
 	) {
 		await validateFreeModelUsage(
