@@ -117,7 +117,12 @@ export default async function ModelProviderOgImage({ params }: ImageProps) {
 		);
 		const supportingProviders = uniqueProviderIds
 			.map((providerId) => {
-				const icon = getProviderIcon(providerId);
+				const icon =
+					providerId === "aws-bedrock"
+						? AWSBedrockIconStatic
+						: providerId === "minimax"
+							? MinimaxIconStatic
+							: getProviderIcon(providerId);
 				const info = providerDefinitions.find((p) => p.id === providerId);
 				return {
 					id: providerId,

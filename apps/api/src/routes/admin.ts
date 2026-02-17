@@ -459,20 +459,50 @@ admin.openapi(getTimeseries, async (c) => {
 		.groupBy(sql`DATE(${tables.transaction.createdAt})`)
 		.orderBy(asc(sql`DATE(${tables.transaction.createdAt})`));
 
-	// First completed transaction date per org (for cumulative paid customers)
+	// Count of orgs that became paying before the range (bounded SQL query)
+	const [preRangeRow] = await db
+		.select({
+			count: sql<number>`COUNT(*)`.as("count"),
+		})
+		.from(
+			db
+				.select({
+					organizationId: tables.transaction.organizationId,
+				})
+				.from(tables.transaction)
+				.where(eq(tables.transaction.status, "completed"))
+				.groupBy(tables.transaction.organizationId)
+				.having(sql`MIN(${tables.transaction.createdAt}) < ${startDate}`)
+				.as("pre_range_orgs"),
+		);
+	const preRangeCount = Number(preRangeRow?.count ?? 0);
+
+	// New paid customers per day within the range (bounded SQL query)
 	const firstTransactionPerOrg = await db
 		.select({
-			date: sql<string>`DATE(MIN(${tables.transaction.createdAt}))`.as("date"),
+			date: sql<string>`date`.as("date"),
+			count: sql<number>`COUNT(*)`.as("count"),
 		})
-		.from(tables.transaction)
-		.where(eq(tables.transaction.status, "completed"))
-		.groupBy(tables.transaction.organizationId)
-		.orderBy(asc(sql`DATE(MIN(${tables.transaction.createdAt}))`));
-
-	// Count of orgs that became paying before the range
-	const preRangeCount = firstTransactionPerOrg.filter(
-		(row) => new Date(row.date) < startDate,
-	).length;
+		.from(
+			db
+				.select({
+					date: sql<string>`DATE(MIN(${tables.transaction.createdAt}))`.as(
+						"date",
+					),
+				})
+				.from(tables.transaction)
+				.where(eq(tables.transaction.status, "completed"))
+				.groupBy(tables.transaction.organizationId)
+				.having(
+					and(
+						sql`MIN(${tables.transaction.createdAt}) >= ${startDate}`,
+						sql`MIN(${tables.transaction.createdAt}) <= ${endDate}`,
+					),
+				)
+				.as("in_range_orgs"),
+		)
+		.groupBy(sql`date`)
+		.orderBy(asc(sql`date`));
 
 	// Build maps for quick lookup
 	const signupsMap = new Map<string, number>();
@@ -487,9 +517,7 @@ admin.openapi(getTimeseries, async (c) => {
 
 	const newPaidMap = new Map<string, number>();
 	for (const row of firstTransactionPerOrg) {
-		if (new Date(row.date) >= startDate) {
-			newPaidMap.set(row.date, (newPaidMap.get(row.date) ?? 0) + 1);
-		}
+		newPaidMap.set(row.date, Number(row.count));
 	}
 
 	// Fill all dates in range
@@ -518,7 +546,7 @@ admin.openapi(getTimeseries, async (c) => {
 
 		data.push({
 			date: dateStr,
-			signups: dailySignups,
+			signups: totalSignups,
 			paidCustomers: cumulativePaid,
 			revenue: dailyRevenue,
 		});

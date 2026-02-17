@@ -54,7 +54,7 @@ export function SignupsChart({
 				<div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
 					<CardTitle>Signups & Paid Customers</CardTitle>
 					<CardDescription>
-						Daily signups and cumulative paid customers over time
+						Cumulative signups and paid customers over time
 					</CardDescription>
 				</div>
 				<div className="flex">
