@@ -535,6 +535,7 @@ export const anthropicModels = [
 				test: "skip",
 				providerId: "anthropic",
 				modelName: "claude-3-5-sonnet-20240620",
+				deactivatedAt: new Date("2026-02-19"),
 				inputPrice: 3.0 / 1e6,
 				outputPrice: 15.0 / 1e6,
 				cachedInputPrice: 0.3 / 1e6,
