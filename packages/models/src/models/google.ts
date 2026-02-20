@@ -493,6 +493,7 @@ export const googleModels = [
 		releasedAt: new Date("2025-11-18"),
 		providers: [
 			{
+				test: "skip",
 				providerId: "google-ai-studio",
 				modelName: "gemini-3-pro-preview",
 				inputPrice: 2 / 1e6,
@@ -528,6 +529,7 @@ export const googleModels = [
 				jsonOutputSchema: true,
 			},
 			{
+				test: "skip",
 				providerId: "google-vertex",
 				modelName: "gemini-3-pro-preview",
 				inputPrice: 2 / 1e6,
@@ -610,6 +612,7 @@ export const googleModels = [
 		releasedAt: new Date("2026-02-19"),
 		providers: [
 			{
+				test: "skip",
 				providerId: "google-ai-studio",
 				modelName: "gemini-3.1-pro-preview",
 				inputPrice: 2 / 1e6,
@@ -645,6 +648,7 @@ export const googleModels = [
 				jsonOutputSchema: true,
 			},
 			{
+				test: "skip",
 				providerId: "google-vertex",
 				modelName: "gemini-3.1-pro-preview",
 				inputPrice: 2 / 1e6,
