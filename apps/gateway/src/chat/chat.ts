@@ -4117,7 +4117,7 @@ chat.openapi(completions, async (c) => {
 							},
 						};
 					} else {
-						logger.error(
+						logger.warn(
 							"Error reading stream",
 							error instanceof Error ? error : new Error(String(error)),
 						);
