@@ -3835,6 +3835,8 @@ chat.openapi(completions, async (c) => {
 								const contentChunk = extractContent(
 									usedProvider === "google-ai-studio" ||
 										usedProvider === "google-vertex" ||
+										usedProvider === "obsidian" ||
+										usedProvider === "avalanche" ||
 										usedProvider === "anthropic"
 										? data
 										: transformedData,
@@ -3918,6 +3920,8 @@ chat.openapi(completions, async (c) => {
 								const reasoningContentChunk = extractReasoning(
 									usedProvider === "google-ai-studio" ||
 										usedProvider === "google-vertex" ||
+										usedProvider === "obsidian" ||
+										usedProvider === "avalanche" ||
 										usedProvider === "anthropic"
 										? data
 										: transformedData,
