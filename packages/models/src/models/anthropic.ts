@@ -331,7 +331,7 @@ export const anthropicModels = [
 				inputPrice: 3.0 / 1e6,
 				outputPrice: 15.0 / 1e6,
 				cachedInputPrice: 0.3 / 1e6,
-				minCacheableTokens: 1024,
+				minCacheableTokens: 4096,
 				requestPrice: 0,
 				contextSize: 200000,
 				maxOutput: 64000,
