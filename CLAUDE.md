@@ -7,8 +7,15 @@ This file provides guidance to AI agents when working with code in this reposito
 ### Setup and Dependencies
 
 - `pnpm install` - Install all dependencies
-- `pnpm setup` - Full development environment setup (starts Docker, syncs DB, seeds data)
-- `docker compose up -d` - Start PostgreSQL and Redis services
+- `pnpm setup` - Full development environment setup (uses `.env` infrastructure defaults, syncs DB, seeds data)
+- `docker compose up -d` - Optional local PostgreSQL/Redis fallback when not using external `.env` services
+
+### Infrastructure Defaults
+
+- Default development infrastructure uses the database and Redis settings in `.env`
+- PostgreSQL defaults to `DATABASE_URL` (external by default in this repository)
+- Redis defaults to `REDIS_HOST` / `REDIS_PORT` / `REDIS_USERNAME` / `REDIS_PASSWORD` (and `UPSTASH_REDIS_REST_URL` when used)
+- Only use local Docker Postgres/Redis if you explicitly need local fallback infrastructure
 
 ### Development
 
@@ -162,8 +169,9 @@ When creating a new package in `packages/`, include these config files. Copy the
 - Gateway: http://localhost:4001
 - Docs: http://localhost:3005
 - Admin: http://localhost:3006
-- PostgreSQL: localhost:5432
-- Redis: localhost:6379
+- PostgreSQL: use `DATABASE_URL` from `.env` (external by default in this repo)
+- Redis: use `REDIS_*` / `UPSTASH_*` values from `.env` (external by default in this repo)
+- Local fallback (optional): PostgreSQL `localhost:5432`, Redis `localhost:6379` via Docker
 
 ## Folder Structure
 
