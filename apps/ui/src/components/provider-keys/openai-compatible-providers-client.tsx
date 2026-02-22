@@ -196,6 +196,49 @@ function formatTimestamp(value: string) {
 	return format(date, "yyyy-MM-dd HH:mm");
 }
 
+function extractProviderHost(baseUrl: string) {
+	try {
+		return new URL(baseUrl).host;
+	} catch {
+		return baseUrl;
+	}
+}
+
+function getProviderStatusCounts(providers: OpenAICompatibleProvider[]) {
+	return providers.reduce(
+		(acc, provider) => {
+			if (provider.status === "active") {
+				acc.active += 1;
+			}
+			if (provider.status === "inactive") {
+				acc.inactive += 1;
+			}
+			return acc;
+		},
+		{ active: 0, inactive: 0 },
+	);
+}
+
+function getStatusTone(status: OpenAICompatibleProvider["status"]) {
+	if (status === "active") {
+		return "text-emerald-600";
+	}
+	if (status === "inactive") {
+		return "text-amber-600";
+	}
+	return "text-muted-foreground";
+}
+
+function getStatusDotTone(status: OpenAICompatibleProvider["status"]) {
+	if (status === "active") {
+		return "bg-emerald-500";
+	}
+	if (status === "inactive") {
+		return "bg-amber-500";
+	}
+	return "bg-muted-foreground";
+}
+
 function getOpenApiErrorMessage(error: unknown, fallback: string) {
 	if (typeof error === "object" && error !== null) {
 		const err = error as Record<string, unknown>;
@@ -338,12 +381,18 @@ function ProviderCreateDialog({
 								<FormItem>
 									<FormLabel>Status</FormLabel>
 									<FormControl>
-										<div className="flex items-center gap-2">
+										<div
+											className="flex items-center gap-2"
+											role="radiogroup"
+											aria-label="Status"
+										>
 											<Button
 												type="button"
 												variant={
 													field.value === "active" ? "default" : "outline"
 												}
+												role="radio"
+												aria-checked={field.value === "active"}
 												onClick={() => field.onChange("active")}
 											>
 												Active
@@ -353,6 +402,8 @@ function ProviderCreateDialog({
 												variant={
 													field.value === "inactive" ? "default" : "outline"
 												}
+												role="radio"
+												aria-checked={field.value === "inactive"}
 												onClick={() => field.onChange("inactive")}
 											>
 												Inactive
@@ -518,12 +569,18 @@ function ProviderUpdateDialog({
 								<FormItem>
 									<FormLabel>Status</FormLabel>
 									<FormControl>
-										<div className="flex items-center gap-2">
+										<div
+											className="flex items-center gap-2"
+											role="radiogroup"
+											aria-label="Status"
+										>
 											<Button
 												type="button"
 												variant={
 													field.value === "active" ? "default" : "outline"
 												}
+												role="radio"
+												aria-checked={field.value === "active"}
 												onClick={() => field.onChange("active")}
 											>
 												Active
@@ -533,6 +590,8 @@ function ProviderUpdateDialog({
 												variant={
 													field.value === "inactive" ? "default" : "outline"
 												}
+												role="radio"
+												aria-checked={field.value === "inactive"}
 												onClick={() => field.onChange("inactive")}
 											>
 												Inactive
@@ -847,12 +906,18 @@ function ProviderKeysSection({ provider }: ProviderKeysSectionProps) {
 										<FormItem>
 											<FormLabel>Status</FormLabel>
 											<FormControl>
-												<div className="flex items-center gap-2">
+												<div
+													className="flex items-center gap-2"
+													role="radiogroup"
+													aria-label="Status"
+												>
 													<Button
 														type="button"
 														variant={
 															field.value === "active" ? "default" : "outline"
 														}
+														role="radio"
+														aria-checked={field.value === "active"}
 														onClick={() => field.onChange("active")}
 													>
 														Active
@@ -862,6 +927,8 @@ function ProviderKeysSection({ provider }: ProviderKeysSectionProps) {
 														variant={
 															field.value === "inactive" ? "default" : "outline"
 														}
+														role="radio"
+														aria-checked={field.value === "inactive"}
 														onClick={() => field.onChange("inactive")}
 													>
 														Inactive
@@ -912,181 +979,195 @@ function ProviderKeysSection({ provider }: ProviderKeysSectionProps) {
 					No keys added yet.
 				</div>
 			) : (
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Label</TableHead>
-							<TableHead>Masked token</TableHead>
-							<TableHead>Status</TableHead>
-							<TableHead>Created</TableHead>
-							<TableHead className="text-right">Actions</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{keys.map((key) => {
-							const isEditing = editingKeyId === key.id;
+				<div className="w-full overflow-x-auto">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Label</TableHead>
+								<TableHead>Masked token</TableHead>
+								<TableHead>Status</TableHead>
+								<TableHead>Created</TableHead>
+								<TableHead className="text-right">Actions</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{keys.map((key) => {
+								const isEditing = editingKeyId === key.id;
 
-							return (
-								<TableRow key={key.id}>
-									<TableCell>{key.label || "-"}</TableCell>
-									<TableCell className="font-mono text-xs">
-										{key.maskedToken}
-									</TableCell>
-									<TableCell>
-										<StatusBadge status={key.status} variant="detailed" />
-									</TableCell>
-									<TableCell>{formatTimestamp(key.createdAt)}</TableCell>
-									<TableCell className="text-right">
-										<div className="flex items-center justify-end gap-2">
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() =>
-													copyText(key.maskedToken, "Copied masked token")
-												}
-											>
-												<Copy className="h-4 w-4" />
-												<span className="sr-only">Copy masked token</span>
-											</Button>
-
-											<Dialog
-												open={isEditing}
-												onOpenChange={(nextOpen) => {
-													setEditingKeyId(nextOpen ? key.id : null);
-													if (nextOpen) {
-														editForm.reset({
-															label: key.label || "",
-															status:
-																key.status === "inactive"
-																	? "inactive"
-																	: "active",
-														});
+								return (
+									<TableRow key={key.id}>
+										<TableCell>{key.label || "-"}</TableCell>
+										<TableCell className="font-mono text-xs">
+											{key.maskedToken}
+										</TableCell>
+										<TableCell>
+											<StatusBadge status={key.status} variant="detailed" />
+										</TableCell>
+										<TableCell>{formatTimestamp(key.createdAt)}</TableCell>
+										<TableCell className="text-right">
+											<div className="flex items-center justify-end gap-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() =>
+														copyText(key.maskedToken, "Copied masked token")
 													}
-												}}
-											>
-												<DialogTrigger asChild>
-													<Button variant="outline" size="sm">
-														<Pencil className="h-4 w-4" />
-														<span className="sr-only">Edit key</span>
-													</Button>
-												</DialogTrigger>
-												<DialogContent className="sm:max-w-[520px]">
-													<DialogHeader>
-														<DialogTitle>Edit Provider Key</DialogTitle>
-														<DialogDescription>
-															Update key label or status.
-														</DialogDescription>
-													</DialogHeader>
-													<Form {...editForm}>
-														<form
-															onSubmit={editForm.handleSubmit((values) =>
-																onEditKey(key.id, values),
-															)}
-															className="space-y-4"
-														>
-															<FormField
-																control={editForm.control}
-																name="label"
-																render={({ field }) => (
-																	<FormItem>
-																		<FormLabel>Label</FormLabel>
-																		<FormControl>
-																			<Input
-																				placeholder="production"
-																				{...field}
-																			/>
-																		</FormControl>
-																		<FormMessage />
-																	</FormItem>
-																)}
-															/>
-															<FormField
-																control={editForm.control}
-																name="status"
-																render={({ field }) => (
-																	<FormItem>
-																		<FormLabel>Status</FormLabel>
-																		<FormControl>
-																			<div className="flex items-center gap-2">
-																				<Button
-																					type="button"
-																					variant={
-																						field.value === "active"
-																							? "default"
-																							: "outline"
-																					}
-																					onClick={() =>
-																						field.onChange("active")
-																					}
-																				>
-																					Active
-																				</Button>
-																				<Button
-																					type="button"
-																					variant={
-																						field.value === "inactive"
-																							? "default"
-																							: "outline"
-																					}
-																					onClick={() =>
-																						field.onChange("inactive")
-																					}
-																				>
-																					Inactive
-																				</Button>
-																			</div>
-																		</FormControl>
-																		<FormMessage />
-																	</FormItem>
-																)}
-															/>
-															<DialogFooter>
-																<Button
-																	type="button"
-																	variant="outline"
-																	onClick={() => setEditingKeyId(null)}
-																>
-																	Cancel
-																</Button>
-																<Button
-																	type="submit"
-																	disabled={updateKeyMutation.isPending}
-																>
-																	{updateKeyMutation.isPending ? (
-																		<>
-																			<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-																			Saving
-																		</>
-																	) : (
-																		"Save"
-																	)}
-																</Button>
-															</DialogFooter>
-														</form>
-													</Form>
-												</DialogContent>
-											</Dialog>
+												>
+													<Copy className="h-4 w-4" />
+													<span className="sr-only">Copy masked token</span>
+												</Button>
 
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => onDeleteKey(key.id)}
-												disabled={deleteKeyMutation.isPending}
-											>
-												{deleteKeyMutation.isPending ? (
-													<Loader2 className="h-4 w-4 animate-spin" />
-												) : (
-													<Trash className="h-4 w-4" />
-												)}
-												<span className="sr-only">Delete key</span>
-											</Button>
-										</div>
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
+												<Dialog
+													open={isEditing}
+													onOpenChange={(nextOpen) => {
+														setEditingKeyId(nextOpen ? key.id : null);
+														if (nextOpen) {
+															editForm.reset({
+																label: key.label || "",
+																status:
+																	key.status === "inactive"
+																		? "inactive"
+																		: "active",
+															});
+														}
+													}}
+												>
+													<DialogTrigger asChild>
+														<Button variant="outline" size="sm">
+															<Pencil className="h-4 w-4" />
+															<span className="sr-only">Edit key</span>
+														</Button>
+													</DialogTrigger>
+													<DialogContent className="sm:max-w-[520px]">
+														<DialogHeader>
+															<DialogTitle>Edit Provider Key</DialogTitle>
+															<DialogDescription>
+																Update key label or status.
+															</DialogDescription>
+														</DialogHeader>
+														<Form {...editForm}>
+															<form
+																onSubmit={editForm.handleSubmit((values) =>
+																	onEditKey(key.id, values),
+																)}
+																className="space-y-4"
+															>
+																<FormField
+																	control={editForm.control}
+																	name="label"
+																	render={({ field }) => (
+																		<FormItem>
+																			<FormLabel>Label</FormLabel>
+																			<FormControl>
+																				<Input
+																					placeholder="production"
+																					{...field}
+																				/>
+																			</FormControl>
+																			<FormMessage />
+																		</FormItem>
+																	)}
+																/>
+																<FormField
+																	control={editForm.control}
+																	name="status"
+																	render={({ field }) => (
+																		<FormItem>
+																			<FormLabel>Status</FormLabel>
+																			<FormControl>
+																				<div
+																					className="flex items-center gap-2"
+																					role="radiogroup"
+																					aria-label="Status"
+																				>
+																					<Button
+																						type="button"
+																						variant={
+																							field.value === "active"
+																								? "default"
+																								: "outline"
+																						}
+																						role="radio"
+																						aria-checked={
+																							field.value === "active"
+																						}
+																						onClick={() =>
+																							field.onChange("active")
+																						}
+																					>
+																						Active
+																					</Button>
+																					<Button
+																						type="button"
+																						variant={
+																							field.value === "inactive"
+																								? "default"
+																								: "outline"
+																						}
+																						role="radio"
+																						aria-checked={
+																							field.value === "inactive"
+																						}
+																						onClick={() =>
+																							field.onChange("inactive")
+																						}
+																					>
+																						Inactive
+																					</Button>
+																				</div>
+																			</FormControl>
+																			<FormMessage />
+																		</FormItem>
+																	)}
+																/>
+																<DialogFooter>
+																	<Button
+																		type="button"
+																		variant="outline"
+																		onClick={() => setEditingKeyId(null)}
+																	>
+																		Cancel
+																	</Button>
+																	<Button
+																		type="submit"
+																		disabled={updateKeyMutation.isPending}
+																	>
+																		{updateKeyMutation.isPending ? (
+																			<>
+																				<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+																				Saving
+																			</>
+																		) : (
+																			"Save"
+																		)}
+																	</Button>
+																</DialogFooter>
+															</form>
+														</Form>
+													</DialogContent>
+												</Dialog>
+
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => onDeleteKey(key.id)}
+													disabled={deleteKeyMutation.isPending}
+												>
+													{deleteKeyMutation.isPending ? (
+														<Loader2 className="h-4 w-4 animate-spin" />
+													) : (
+														<Trash className="h-4 w-4" />
+													)}
+													<span className="sr-only">Delete key</span>
+												</Button>
+											</div>
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</div>
 			)}
 		</div>
 	);
@@ -1299,12 +1380,18 @@ function AliasesSection({ provider }: AliasesSectionProps) {
 										<FormItem>
 											<FormLabel>Status</FormLabel>
 											<FormControl>
-												<div className="flex items-center gap-2">
+												<div
+													className="flex items-center gap-2"
+													role="radiogroup"
+													aria-label="Status"
+												>
 													<Button
 														type="button"
 														variant={
 															field.value === "active" ? "default" : "outline"
 														}
+														role="radio"
+														aria-checked={field.value === "active"}
 														onClick={() => field.onChange("active")}
 													>
 														Active
@@ -1314,6 +1401,8 @@ function AliasesSection({ provider }: AliasesSectionProps) {
 														variant={
 															field.value === "inactive" ? "default" : "outline"
 														}
+														role="radio"
+														aria-checked={field.value === "inactive"}
 														onClick={() => field.onChange("inactive")}
 													>
 														Inactive
@@ -1367,192 +1456,209 @@ function AliasesSection({ provider }: AliasesSectionProps) {
 					No aliases added yet.
 				</div>
 			) : (
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Alias</TableHead>
-							<TableHead>Model ID</TableHead>
-							<TableHead>Status</TableHead>
-							<TableHead>Created</TableHead>
-							<TableHead className="text-right">Actions</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{aliases.map((alias) => {
-							const isEditing = editingAliasId === alias.id;
+				<div className="w-full overflow-x-auto">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Alias</TableHead>
+								<TableHead>Model ID</TableHead>
+								<TableHead>Status</TableHead>
+								<TableHead>Created</TableHead>
+								<TableHead className="text-right">Actions</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{aliases.map((alias) => {
+								const isEditing = editingAliasId === alias.id;
 
-							return (
-								<TableRow key={alias.id}>
-									<TableCell className="font-mono text-xs">
-										{alias.alias}
-									</TableCell>
-									<TableCell className="font-mono text-xs">
-										{alias.modelId}
-									</TableCell>
-									<TableCell>
-										<StatusBadge status={alias.status} variant="detailed" />
-									</TableCell>
-									<TableCell>{formatTimestamp(alias.createdAt)}</TableCell>
-									<TableCell className="text-right">
-										<div className="flex items-center justify-end gap-2">
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => copyText(alias.alias, "Copied alias")}
-											>
-												<Copy className="h-4 w-4" />
-												<span className="sr-only">Copy alias</span>
-											</Button>
+								return (
+									<TableRow key={alias.id}>
+										<TableCell className="font-mono text-xs">
+											{alias.alias}
+										</TableCell>
+										<TableCell className="font-mono text-xs">
+											{alias.modelId}
+										</TableCell>
+										<TableCell>
+											<StatusBadge status={alias.status} variant="detailed" />
+										</TableCell>
+										<TableCell>{formatTimestamp(alias.createdAt)}</TableCell>
+										<TableCell className="text-right">
+											<div className="flex items-center justify-end gap-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => copyText(alias.alias, "Copied alias")}
+												>
+													<Copy className="h-4 w-4" />
+													<span className="sr-only">Copy alias</span>
+												</Button>
 
-											<Dialog
-												open={isEditing}
-												onOpenChange={(nextOpen) => {
-													setEditingAliasId(nextOpen ? alias.id : null);
-													if (nextOpen) {
-														editForm.reset({
-															alias: alias.alias,
-															modelId: alias.modelId,
-															status:
-																alias.status === "inactive"
-																	? "inactive"
-																	: "active",
-														});
-													}
-												}}
-											>
-												<DialogTrigger asChild>
-													<Button variant="outline" size="sm">
-														<Pencil className="h-4 w-4" />
-														<span className="sr-only">Edit alias</span>
-													</Button>
-												</DialogTrigger>
-												<DialogContent className="sm:max-w-[520px]">
-													<DialogHeader>
-														<DialogTitle>Edit Alias</DialogTitle>
-														<DialogDescription>
-															Update alias mapping and status.
-														</DialogDescription>
-													</DialogHeader>
-													<Form {...editForm}>
-														<form
-															onSubmit={editForm.handleSubmit((values) =>
-																onEditAlias(alias.id, values),
-															)}
-															className="space-y-4"
-														>
-															<FormField
-																control={editForm.control}
-																name="alias"
-																render={({ field }) => (
-																	<FormItem>
-																		<FormLabel>Alias</FormLabel>
-																		<FormControl>
-																			<Input placeholder="gpt4o" {...field} />
-																		</FormControl>
-																		<FormMessage />
-																	</FormItem>
+												<Dialog
+													open={isEditing}
+													onOpenChange={(nextOpen) => {
+														setEditingAliasId(nextOpen ? alias.id : null);
+														if (nextOpen) {
+															editForm.reset({
+																alias: alias.alias,
+																modelId: alias.modelId,
+																status:
+																	alias.status === "inactive"
+																		? "inactive"
+																		: "active",
+															});
+														}
+													}}
+												>
+													<DialogTrigger asChild>
+														<Button variant="outline" size="sm">
+															<Pencil className="h-4 w-4" />
+															<span className="sr-only">Edit alias</span>
+														</Button>
+													</DialogTrigger>
+													<DialogContent className="sm:max-w-[520px]">
+														<DialogHeader>
+															<DialogTitle>Edit Alias</DialogTitle>
+															<DialogDescription>
+																Update alias mapping and status.
+															</DialogDescription>
+														</DialogHeader>
+														<Form {...editForm}>
+															<form
+																onSubmit={editForm.handleSubmit((values) =>
+																	onEditAlias(alias.id, values),
 																)}
-															/>
-															<FormField
-																control={editForm.control}
-																name="modelId"
-																render={({ field }) => (
-																	<FormItem>
-																		<FormLabel>Model ID</FormLabel>
-																		<FormControl>
-																			<Input placeholder="gpt-4.1" {...field} />
-																		</FormControl>
-																		<FormMessage />
-																	</FormItem>
-																)}
-															/>
-															<FormField
-																control={editForm.control}
-																name="status"
-																render={({ field }) => (
-																	<FormItem>
-																		<FormLabel>Status</FormLabel>
-																		<FormControl>
-																			<div className="flex items-center gap-2">
-																				<Button
-																					type="button"
-																					variant={
-																						field.value === "active"
-																							? "default"
-																							: "outline"
-																					}
-																					onClick={() =>
-																						field.onChange("active")
-																					}
-																				>
-																					Active
-																				</Button>
-																				<Button
-																					type="button"
-																					variant={
-																						field.value === "inactive"
-																							? "default"
-																							: "outline"
-																					}
-																					onClick={() =>
-																						field.onChange("inactive")
-																					}
-																				>
-																					Inactive
-																				</Button>
-																			</div>
-																		</FormControl>
-																		<FormMessage />
-																	</FormItem>
-																)}
-															/>
-															<DialogFooter>
-																<Button
-																	type="button"
-																	variant="outline"
-																	onClick={() => setEditingAliasId(null)}
-																>
-																	Cancel
-																</Button>
-																<Button
-																	type="submit"
-																	disabled={updateAliasMutation.isPending}
-																>
-																	{updateAliasMutation.isPending ? (
-																		<>
-																			<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-																			Saving
-																		</>
-																	) : (
-																		"Save"
+																className="space-y-4"
+															>
+																<FormField
+																	control={editForm.control}
+																	name="alias"
+																	render={({ field }) => (
+																		<FormItem>
+																			<FormLabel>Alias</FormLabel>
+																			<FormControl>
+																				<Input placeholder="gpt4o" {...field} />
+																			</FormControl>
+																			<FormMessage />
+																		</FormItem>
 																	)}
-																</Button>
-															</DialogFooter>
-														</form>
-													</Form>
-												</DialogContent>
-											</Dialog>
+																/>
+																<FormField
+																	control={editForm.control}
+																	name="modelId"
+																	render={({ field }) => (
+																		<FormItem>
+																			<FormLabel>Model ID</FormLabel>
+																			<FormControl>
+																				<Input
+																					placeholder="gpt-4.1"
+																					{...field}
+																				/>
+																			</FormControl>
+																			<FormMessage />
+																		</FormItem>
+																	)}
+																/>
+																<FormField
+																	control={editForm.control}
+																	name="status"
+																	render={({ field }) => (
+																		<FormItem>
+																			<FormLabel>Status</FormLabel>
+																			<FormControl>
+																				<div
+																					className="flex items-center gap-2"
+																					role="radiogroup"
+																					aria-label="Status"
+																				>
+																					<Button
+																						type="button"
+																						variant={
+																							field.value === "active"
+																								? "default"
+																								: "outline"
+																						}
+																						role="radio"
+																						aria-checked={
+																							field.value === "active"
+																						}
+																						onClick={() =>
+																							field.onChange("active")
+																						}
+																					>
+																						Active
+																					</Button>
+																					<Button
+																						type="button"
+																						variant={
+																							field.value === "inactive"
+																								? "default"
+																								: "outline"
+																						}
+																						role="radio"
+																						aria-checked={
+																							field.value === "inactive"
+																						}
+																						onClick={() =>
+																							field.onChange("inactive")
+																						}
+																					>
+																						Inactive
+																					</Button>
+																				</div>
+																			</FormControl>
+																			<FormMessage />
+																		</FormItem>
+																	)}
+																/>
+																<DialogFooter>
+																	<Button
+																		type="button"
+																		variant="outline"
+																		onClick={() => setEditingAliasId(null)}
+																	>
+																		Cancel
+																	</Button>
+																	<Button
+																		type="submit"
+																		disabled={updateAliasMutation.isPending}
+																	>
+																		{updateAliasMutation.isPending ? (
+																			<>
+																				<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+																				Saving
+																			</>
+																		) : (
+																			"Save"
+																		)}
+																	</Button>
+																</DialogFooter>
+															</form>
+														</Form>
+													</DialogContent>
+												</Dialog>
 
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => onDeleteAlias(alias.id)}
-												disabled={deleteAliasMutation.isPending}
-											>
-												{deleteAliasMutation.isPending ? (
-													<Loader2 className="h-4 w-4 animate-spin" />
-												) : (
-													<Trash className="h-4 w-4" />
-												)}
-												<span className="sr-only">Delete alias</span>
-											</Button>
-										</div>
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => onDeleteAlias(alias.id)}
+													disabled={deleteAliasMutation.isPending}
+												>
+													{deleteAliasMutation.isPending ? (
+														<Loader2 className="h-4 w-4 animate-spin" />
+													) : (
+														<Trash className="h-4 w-4" />
+													)}
+													<span className="sr-only">Delete alias</span>
+												</Button>
+											</div>
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</div>
 			)}
 		</div>
 	);
@@ -1638,31 +1744,35 @@ function ModelsSection({ provider }: ModelsSectionProps) {
 					No models returned.
 				</div>
 			) : (
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Model ID</TableHead>
-							<TableHead className="text-right">Actions</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{models.map((model: OpenAICompatibleModel) => (
-							<TableRow key={model.id}>
-								<TableCell className="font-mono text-xs">{model.id}</TableCell>
-								<TableCell className="text-right">
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => copyText(model.id, "Copied model ID")}
-									>
-										<Copy className="h-4 w-4" />
-										<span className="sr-only">Copy model ID</span>
-									</Button>
-								</TableCell>
+				<div className="w-full overflow-x-auto">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Model ID</TableHead>
+								<TableHead className="text-right">Actions</TableHead>
 							</TableRow>
-						))}
-					</TableBody>
-				</Table>
+						</TableHeader>
+						<TableBody>
+							{models.map((model: OpenAICompatibleModel) => (
+								<TableRow key={model.id}>
+									<TableCell className="font-mono text-xs">
+										{model.id}
+									</TableCell>
+									<TableCell className="text-right">
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => copyText(model.id, "Copied model ID")}
+										>
+											<Copy className="h-4 w-4" />
+											<span className="sr-only">Copy model ID</span>
+										</Button>
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</div>
 			)}
 		</div>
 	);
@@ -1679,19 +1789,25 @@ function ProviderDetailsPane({
 	onProviderUpdated,
 	onProviderDeleted,
 }: ProviderDetailsPaneProps) {
+	const providerHost = extractProviderHost(provider.baseUrl);
+
 	return (
-		<Card>
-			<CardHeader className="space-y-4">
+		<Card className="overflow-hidden border-border/80 shadow-sm">
+			<CardHeader className="space-y-4 border-b bg-muted/20">
 				<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-					<div className="space-y-1">
-						<CardTitle className="text-xl">{provider.name}</CardTitle>
-						<p className="text-sm text-muted-foreground">{provider.baseUrl}</p>
-						<div className="flex items-center gap-2">
+					<div className="space-y-2">
+						<div className="flex flex-wrap items-center gap-2">
+							<CardTitle className="text-xl">{provider.name}</CardTitle>
 							<StatusBadge status={provider.status} variant="detailed" />
-							<span className="text-xs text-muted-foreground">
-								Created {formatTimestamp(provider.createdAt)}
-							</span>
 						</div>
+						<div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+							<span className="font-mono">{providerHost}</span>
+							<span className="hidden h-1 w-1 rounded-full bg-border md:inline-block" />
+							<span>Created {formatTimestamp(provider.createdAt)}</span>
+							<span className="hidden h-1 w-1 rounded-full bg-border md:inline-block" />
+							<span>Updated {formatTimestamp(provider.updatedAt)}</span>
+						</div>
+						<p className="text-sm text-muted-foreground">{provider.baseUrl}</p>
 					</div>
 					<div className="flex items-center gap-2">
 						<ProviderUpdateDialog
@@ -1705,20 +1821,35 @@ function ProviderDetailsPane({
 					</div>
 				</div>
 			</CardHeader>
-			<CardContent className="space-y-6">
+			<CardContent className="space-y-6 p-5 md:p-6">
 				<Tabs defaultValue="keys" className="w-full">
-					<TabsList>
-						<TabsTrigger value="keys">Keys</TabsTrigger>
-						<TabsTrigger value="aliases">Aliases</TabsTrigger>
-						<TabsTrigger value="models">Models</TabsTrigger>
+					<TabsList className="h-auto w-full justify-start rounded-lg border bg-muted/50 p-1">
+						<TabsTrigger value="keys" className="px-4">
+							Keys
+						</TabsTrigger>
+						<TabsTrigger value="aliases" className="px-4">
+							Aliases
+						</TabsTrigger>
+						<TabsTrigger value="models" className="px-4">
+							Models
+						</TabsTrigger>
 					</TabsList>
-					<TabsContent value="keys" className="pt-2">
+					<TabsContent
+						value="keys"
+						className="mt-4 rounded-lg border bg-background p-4 md:p-5"
+					>
 						<ProviderKeysSection provider={provider} />
 					</TabsContent>
-					<TabsContent value="aliases" className="pt-2">
+					<TabsContent
+						value="aliases"
+						className="mt-4 rounded-lg border bg-background p-4 md:p-5"
+					>
 						<AliasesSection provider={provider} />
 					</TabsContent>
-					<TabsContent value="models" className="pt-2">
+					<TabsContent
+						value="models"
+						className="mt-4 rounded-lg border bg-background p-4 md:p-5"
+					>
 						<ModelsSection provider={provider} />
 					</TabsContent>
 				</Tabs>
@@ -1769,13 +1900,23 @@ export function OpenAICompatibleProvidersClient({
 		}
 
 		if (selectedProviderId) {
-			return providers.find((provider) => provider.id === selectedProviderId);
+			const matchedProvider = providers.find(
+				(provider) => provider.id === selectedProviderId,
+			);
+			return matchedProvider ?? providers[0];
 		}
 
 		return providers[0];
 	}, [providers, selectedProviderId]);
 
 	const selectedProviderName = selectedProvider?.name;
+	const statusCounts = useMemo(
+		() => getProviderStatusCounts(providers),
+		[providers],
+	);
+	const selectedProviderHost = selectedProvider
+		? extractProviderHost(selectedProvider.baseUrl)
+		: null;
 
 	if (!selectedOrganization) {
 		return (
@@ -1796,29 +1937,85 @@ export function OpenAICompatibleProvidersClient({
 
 	return (
 		<div className="flex flex-col">
-			<div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
-				<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-					<div>
-						<h2 className="text-3xl font-bold tracking-tight">
-							OpenAI-Compatible Providers
-						</h2>
-						<p className="text-muted-foreground">
-							Configure provider base URLs, attach multiple keys, and manage
-							model aliases per provider.
-						</p>
-					</div>
-					<ProviderCreateDialog
-						organizationId={selectedOrganization.id}
-						onCreated={(providerId) => {
-							setSelectedProviderId(providerId);
-						}}
-					/>
-				</div>
+			<div className="flex-1 space-y-5 p-4 pt-6 md:space-y-6 md:p-8">
+				<Card className="overflow-hidden border-border/80 shadow-sm">
+					<CardHeader className="gap-4 border-b bg-gradient-to-r from-muted/50 via-muted/25 to-background">
+						<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+							<div className="space-y-2">
+								<p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+									Command Center
+								</p>
+								<h2 className="text-3xl font-bold tracking-tight">
+									OpenAI-Compatible Providers
+								</h2>
+								<p className="text-sm text-muted-foreground">
+									Configure provider base URLs, attach multiple keys, and manage
+									model aliases per provider.
+								</p>
+							</div>
+							<div className="flex flex-wrap items-center gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									className="font-mono text-xs"
+								>
+									Organization ID: {selectedOrganization.id}
+								</Button>
+								<ProviderCreateDialog
+									organizationId={selectedOrganization.id}
+									onCreated={(providerId) => {
+										setSelectedProviderId(providerId);
+									}}
+								/>
+							</div>
+						</div>
+					</CardHeader>
+					<CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+						<div className="rounded-lg border bg-background p-3">
+							<p className="text-xs uppercase tracking-wide text-muted-foreground">
+								Total providers
+							</p>
+							<p className="mt-1 text-2xl font-semibold">{providers.length}</p>
+						</div>
+						<div className="rounded-lg border bg-background p-3">
+							<p className="text-xs uppercase tracking-wide text-muted-foreground">
+								Active
+							</p>
+							<p className="mt-1 text-2xl font-semibold text-emerald-600">
+								{statusCounts.active}
+							</p>
+						</div>
+						<div className="rounded-lg border bg-background p-3">
+							<p className="text-xs uppercase tracking-wide text-muted-foreground">
+								Inactive
+							</p>
+							<p className="mt-1 text-2xl font-semibold text-amber-600">
+								{statusCounts.inactive}
+							</p>
+						</div>
+						<div className="rounded-lg border bg-background p-3">
+							<p className="text-xs uppercase tracking-wide text-muted-foreground">
+								Selected provider
+							</p>
+							<p className="mt-1 truncate text-sm font-semibold">
+								{selectedProviderName ?? "-"}
+							</p>
+							<p className="truncate font-mono text-xs text-muted-foreground">
+								{selectedProviderHost ?? "No provider selected"}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
 
-				<div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-					<Card className="h-fit">
-						<CardHeader className="space-y-3">
-							<CardTitle className="text-base">Providers</CardTitle>
+				<div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+					<Card className="h-fit overflow-hidden border-border/80 shadow-sm">
+						<CardHeader className="space-y-3 border-b bg-muted/20">
+							<div className="flex items-center justify-between gap-2">
+								<CardTitle className="text-base">Provider Navigator</CardTitle>
+								<p className="text-xs text-muted-foreground">
+									{providers.length} total
+								</p>
+							</div>
 							<div className="relative">
 								<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
 								<Input
@@ -1831,7 +2028,7 @@ export function OpenAICompatibleProvidersClient({
 								/>
 							</div>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="p-3">
 							{providersQuery.isLoading ? (
 								<div className="flex items-center gap-2 text-sm text-muted-foreground">
 									<Loader2 className="h-4 w-4 animate-spin" />
@@ -1850,36 +2047,47 @@ export function OpenAICompatibleProvidersClient({
 								<div className="space-y-2">
 									{providers.map((provider) => {
 										const isSelected = selectedProvider?.id === provider.id;
+										const providerHost = extractProviderHost(provider.baseUrl);
 
 										return (
 											<button
 												key={provider.id}
 												type="button"
 												onClick={() => setSelectedProviderId(provider.id)}
-												className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+												className={`w-full rounded-lg border p-3 text-left transition-all ${
 													isSelected
-														? "border-primary bg-primary/5"
-														: "border-border hover:bg-accent"
+														? "border-primary bg-primary/5 shadow-sm"
+														: "border-border/80 bg-background hover:border-border hover:bg-accent/40"
 												}`}
 											>
-												<div className="flex items-center justify-between gap-2">
-													<div className="min-w-0">
+												<div className="flex items-start justify-between gap-2">
+													<div className="min-w-0 space-y-1">
 														<p className="truncate text-sm font-medium">
 															{provider.name}
 														</p>
-														<p className="truncate text-xs text-muted-foreground">
-															{provider.baseUrl}
+														<p className="truncate font-mono text-[11px] text-muted-foreground">
+															{providerHost}
 														</p>
 													</div>
-													{isSelected ? (
-														<Check className="h-4 w-4 text-primary" />
-													) : null}
+													<div className="mt-0.5 flex items-center gap-2">
+														<span
+															className={`inline-block h-2 w-2 rounded-full ${getStatusDotTone(provider.status)}`}
+														/>
+														{isSelected ? (
+															<Check className="h-4 w-4 text-primary" />
+														) : null}
+													</div>
 												</div>
-												<div className="mt-2">
+												<div className="mt-2 flex items-center justify-between">
 													<StatusBadge
 														status={provider.status}
 														variant="simple"
 													/>
+													<span
+														className={`text-[11px] uppercase tracking-wide ${getStatusTone(provider.status)}`}
+													>
+														{provider.status}
+													</span>
 												</div>
 											</button>
 										);
@@ -1905,7 +2113,7 @@ export function OpenAICompatibleProvidersClient({
 							}}
 						/>
 					) : (
-						<Card>
+						<Card className="border-dashed">
 							<CardContent className="flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
 								Select a provider to manage keys, aliases, and model discovery.
 							</CardContent>
