@@ -160,6 +160,34 @@ describe("provider keys route", () => {
 		expect(res.status).toBe(400);
 	});
 
+	test("POST /keys/provider with duplicate custom provider name", async () => {
+		await db.insert(tables.providerKey).values({
+			id: "test-custom-provider-key-id",
+			token: "test-custom-provider-token",
+			provider: "custom",
+			name: "mycustomprovider",
+			baseUrl: "https://custom.example.com",
+			organizationId: "test-org-id",
+		});
+
+		const res = await app.request("/keys/provider", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Cookie: token,
+			},
+			body: JSON.stringify({
+				provider: "custom",
+				token: "test-token",
+				name: "mycustomprovider",
+				baseUrl: "https://another-custom.example.com",
+				organizationId: "test-org-id",
+			}),
+		});
+
+		expect(res.status).toBe(400);
+	});
+
 	test("PATCH /keys/provider/{id}", async () => {
 		const res = await app.request("/keys/provider/test-provider-key-id", {
 			method: "PATCH",

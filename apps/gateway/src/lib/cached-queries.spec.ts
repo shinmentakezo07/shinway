@@ -4,6 +4,9 @@ import {
 	db,
 	apiKey,
 	apiKeyIamRule,
+	openaiCompatibleModelAlias,
+	openaiCompatibleProvider,
+	openaiCompatibleProviderKey,
 	organization,
 	project,
 	providerKey,
@@ -16,6 +19,8 @@ import {
 	findProjectById,
 	findOrganizationById,
 	findCustomProviderKey,
+	findOpenAICompatibleProvider,
+	findOpenAICompatibleProviderAliases,
 	findProviderKey,
 	findActiveProviderKeys,
 	findProviderKeysByProviders,
@@ -47,6 +52,9 @@ describe("Cached Queries - Gateway Database Access", () => {
 		// Clean up test data using regular db
 		await db.delete(apiKeyIamRule);
 		await db.delete(apiKey);
+		await db.delete(openaiCompatibleModelAlias);
+		await db.delete(openaiCompatibleProviderKey);
+		await db.delete(openaiCompatibleProvider);
 		await db.delete(providerKey);
 		await db.delete(userOrganization);
 		await db.delete(project);
@@ -102,9 +110,41 @@ describe("Cached Queries - Gateway Database Access", () => {
 			id: "test-custom-provider-key",
 			token: "test-custom-token",
 			provider: "custom",
+			name: "legacy-custom-provider",
+			baseUrl: "https://api.legacy-custom.example.com",
+			organizationId: testOrgId,
+			status: "active",
+		});
+
+		await db.insert(openaiCompatibleProvider).values({
+			id: "test-openai-compatible-provider-id",
+			organizationId: testOrgId,
 			name: "my-custom-provider",
 			baseUrl: "https://api.custom.example.com",
-			organizationId: testOrgId,
+			status: "active",
+		});
+
+		await db.insert(openaiCompatibleProviderKey).values({
+			id: "test-openai-compatible-provider-key-old",
+			providerId: "test-openai-compatible-provider-id",
+			token: "test-openai-compatible-token-old",
+			label: "oldest",
+			status: "active",
+		});
+
+		await db.insert(openaiCompatibleProviderKey).values({
+			id: "test-openai-compatible-provider-key-new",
+			providerId: "test-openai-compatible-provider-id",
+			token: "test-openai-compatible-token-new",
+			label: "newest",
+			status: "active",
+		});
+
+		await db.insert(openaiCompatibleModelAlias).values({
+			id: "test-openai-compatible-model-alias-id",
+			providerId: "test-openai-compatible-provider-id",
+			alias: "cheap",
+			modelId: "gpt-4o-mini",
 			status: "active",
 		});
 
@@ -121,6 +161,9 @@ describe("Cached Queries - Gateway Database Access", () => {
 		// Clean up test data
 		await db.delete(apiKeyIamRule);
 		await db.delete(apiKey);
+		await db.delete(openaiCompatibleModelAlias);
+		await db.delete(openaiCompatibleProviderKey);
+		await db.delete(openaiCompatibleProvider);
 		await db.delete(providerKey);
 		await db.delete(userOrganization);
 		await db.delete(project);
@@ -179,8 +222,53 @@ describe("Cached Queries - Gateway Database Access", () => {
 		});
 	});
 
+	describe("findOpenAICompatibleProvider", () => {
+		it("should find active OpenAI-compatible provider by organization and name", async () => {
+			const result = await findOpenAICompatibleProvider(
+				testOrgId,
+				"my-custom-provider",
+			);
+
+			expect(result).toBeDefined();
+			expect(result?.id).toBe("test-openai-compatible-provider-id");
+			expect(result?.name).toBe("my-custom-provider");
+			expect(result?.baseUrl).toBe("https://api.custom.example.com");
+			expect(result?.status).toBe("active");
+		});
+
+		it("should return undefined for non-existent provider", async () => {
+			const result = await findOpenAICompatibleProvider(
+				testOrgId,
+				"nonexistent",
+			);
+
+			expect(result).toBeUndefined();
+		});
+	});
+
+	describe("findOpenAICompatibleProviderAliases", () => {
+		it("should return active aliases for provider", async () => {
+			const result = await findOpenAICompatibleProviderAliases(
+				"test-openai-compatible-provider-id",
+			);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]?.alias).toBe("cheap");
+			expect(result[0]?.modelId).toBe("gpt-4o-mini");
+			expect(result[0]?.status).toBe("active");
+		});
+
+		it("should return empty array when provider has no aliases", async () => {
+			const result = await findOpenAICompatibleProviderAliases(
+				"nonexistent-provider-id",
+			);
+
+			expect(result).toHaveLength(0);
+		});
+	});
+
 	describe("findCustomProviderKey", () => {
-		it("should find custom provider key by organization and name", async () => {
+		it("should find custom provider key from new OpenAI-compatible tables", async () => {
 			const result = await findCustomProviderKey(
 				testOrgId,
 				"my-custom-provider",
@@ -190,6 +278,21 @@ describe("Cached Queries - Gateway Database Access", () => {
 			expect(result?.provider).toBe("custom");
 			expect(result?.name).toBe("my-custom-provider");
 			expect(result?.organizationId).toBe(testOrgId);
+			expect(result?.token).toBe("test-openai-compatible-token-old");
+			expect(result?.baseUrl).toBe("https://api.custom.example.com");
+		});
+
+		it("should fall back to legacy provider_key table", async () => {
+			const result = await findCustomProviderKey(
+				testOrgId,
+				"legacy-custom-provider",
+			);
+
+			expect(result).toBeDefined();
+			expect(result?.provider).toBe("custom");
+			expect(result?.name).toBe("legacy-custom-provider");
+			expect(result?.token).toBe("test-custom-token");
+			expect(result?.baseUrl).toBe("https://api.legacy-custom.example.com");
 		});
 
 		it("should return undefined for non-existent custom provider", async () => {

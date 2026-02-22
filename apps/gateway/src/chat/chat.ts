@@ -10,6 +10,8 @@ import {
 	findProjectById,
 	findOrganizationById,
 	findCustomProviderKey,
+	findOpenAICompatibleProvider,
+	findOpenAICompatibleProviderAliases,
 	findProviderKey,
 	findActiveProviderKeys,
 	findProviderKeysByProviders,
@@ -423,23 +425,14 @@ chat.openapi(completions, async (c) => {
 
 	// Parse model input to resolve model, provider, and custom provider name
 	const parseResult = parseModelInput(modelInput);
-	const requestedModel = parseResult.requestedModel;
+	let requestedModel = parseResult.requestedModel;
 	const customProviderName = parseResult.customProviderName;
+	let requestedProvider = parseResult.requestedProvider;
 
-	// Count input images from messages for cost calculation
-	const inputImageCount =
-		requestedModel === "gemini-3-pro-image-preview"
-			? countInputImages(messages)
-			: 0;
-
-	// Resolve model info and filter deactivated providers
-	const modelInfoResult = resolveModelInfo(
-		requestedModel,
-		parseResult.requestedProvider,
-	);
-	let modelInfo = modelInfoResult.modelInfo;
-	const allModelProviders = modelInfoResult.allModelProviders;
-	let requestedProvider = modelInfoResult.requestedProvider;
+	// Resolved later after custom-provider alias and auth-based validation
+	let inputImageCount = 0;
+	let modelInfo: ModelDefinition;
+	let allModelProviders: ProviderModelMapping[];
 
 	// === Early API key and organization validation for coding model restriction ===
 	// We need to fetch these early to check coding model restrictions before capability checks
@@ -563,6 +556,75 @@ chat.openapi(completions, async (c) => {
 		}
 	}
 
+	let usedProvider: Provider | undefined;
+	let usedModel: string;
+	let routingMetadata: RoutingMetadata | undefined;
+
+	// Extract retention level for data storage cost calculation
+	const retentionLevel = organization?.retentionLevel ?? "none";
+
+	// Get image size limits from environment variables or use defaults
+	const freeLimitMB = Number(process.env.IMAGE_SIZE_LIMIT_FREE_MB) || 10;
+	const proLimitMB = Number(process.env.IMAGE_SIZE_LIMIT_PRO_MB) || 100;
+
+	// Determine max image size based on plan
+	const userPlan = organization?.plan || "free";
+	const maxImageSizeMB = userPlan === "pro" ? proLimitMB : freeLimitMB;
+
+	// Validate custom provider and resolve alias mapping if one was requested
+	if (requestedProvider === "custom" && customProviderName) {
+		const customProvider = await findOpenAICompatibleProvider(
+			project.organizationId,
+			customProviderName,
+		);
+		if (customProvider) {
+			const providerAliases = await findOpenAICompatibleProviderAliases(
+				customProvider.id,
+			);
+			const requestedAlias = requestedModel.toLowerCase();
+			const matchedAlias = providerAliases.find(
+				(alias) => alias.alias === requestedAlias,
+			);
+			if (matchedAlias) {
+				requestedModel = matchedAlias.modelId as typeof requestedModel;
+			}
+		}
+
+		const customProviderKey = await findCustomProviderKey(
+			project.organizationId,
+			customProviderName,
+		);
+		if (!customProviderKey) {
+			throw new HTTPException(400, {
+				message: `Provider '${customProviderName}' not found.`,
+			});
+		}
+	}
+
+	// Count input images from messages for cost calculation
+	inputImageCount =
+		requestedModel === "gemini-3-pro-image-preview"
+			? countInputImages(messages)
+			: 0;
+
+	// Resolve model info and filter deactivated providers (after alias resolution)
+	const modelInfoResult = resolveModelInfo(requestedModel, requestedProvider);
+	modelInfo = modelInfoResult.modelInfo;
+	allModelProviders = modelInfoResult.allModelProviders;
+	requestedProvider = modelInfoResult.requestedProvider;
+
+	// Validate IAM rules for model access (after alias/model resolution)
+	const iamValidation = await validateModelAccess(
+		apiKey.id,
+		modelInfo.id,
+		requestedProvider,
+	);
+	if (!iamValidation.allowed) {
+		throwIamException(iamValidation.reason!);
+	}
+	// IAM allowed providers - used to filter available providers during routing
+	const iamAllowedProviders = iamValidation.allowedProviders;
+
 	// Validate coding model restriction for dev plan personal orgs
 	// This check must happen BEFORE capability checks to give the right error message
 	if (
@@ -587,45 +649,8 @@ chat.openapi(completions, async (c) => {
 		webSearchTool,
 	});
 
-	let usedProvider = requestedProvider;
-	let usedModel: string = requestedModel;
-	let routingMetadata: RoutingMetadata | undefined;
-
-	// Extract retention level for data storage cost calculation
-	const retentionLevel = organization?.retentionLevel ?? "none";
-
-	// Get image size limits from environment variables or use defaults
-	const freeLimitMB = Number(process.env.IMAGE_SIZE_LIMIT_FREE_MB) || 10;
-	const proLimitMB = Number(process.env.IMAGE_SIZE_LIMIT_PRO_MB) || 100;
-
-	// Determine max image size based on plan
-	const userPlan = organization?.plan || "free";
-	const maxImageSizeMB = userPlan === "pro" ? proLimitMB : freeLimitMB;
-
-	// Validate IAM rules for model access
-	const iamValidation = await validateModelAccess(
-		apiKey.id,
-		modelInfo.id,
-		requestedProvider,
-	);
-	if (!iamValidation.allowed) {
-		throwIamException(iamValidation.reason!);
-	}
-	// IAM allowed providers - used to filter available providers during routing
-	const iamAllowedProviders = iamValidation.allowedProviders;
-
-	// Validate the custom provider against the database if one was requested
-	if (requestedProvider === "custom" && customProviderName) {
-		const customProviderKey = await findCustomProviderKey(
-			project.organizationId,
-			customProviderName,
-		);
-		if (!customProviderKey) {
-			throw new HTTPException(400, {
-				message: `Provider '${customProviderName}' not found.`,
-			});
-		}
-	}
+	usedProvider = requestedProvider;
+	usedModel = requestedModel;
 
 	// Apply routing logic after apiKey and project are available
 	if (
@@ -890,12 +915,13 @@ chat.openapi(completions, async (c) => {
 		}
 		// Clear requestedProvider so retry/fallback logic knows this was auto-routed
 		requestedProvider = undefined;
-	} else if (
-		(usedProvider === "llmgateway" && usedModel === "custom") ||
-		usedModel === "custom"
-	) {
-		usedProvider = "llmgateway";
-		usedModel = "custom";
+	} else if (usedProvider === "llmgateway" && usedModel === "custom") {
+		// Keep llmgateway/custom semantics only when llmgateway was explicitly requested.
+		// For named custom providers (e.g. providerName/custom), preserve provider context.
+		if (!customProviderName) {
+			usedProvider = "llmgateway";
+			usedModel = "custom";
+		}
 	}
 
 	// Check uptime for specifically requested providers (not llmgateway or custom)
@@ -1925,10 +1951,14 @@ chat.openapi(completions, async (c) => {
 	const effectiveStream = fakeStreamingForImageGen ? false : stream;
 
 	if (stream) {
-		if (
-			!isImageGeneration &&
-			getModelStreamingSupport(baseModelName, usedProvider) === false
-		) {
+		const streamProviderMapping = finalModelInfo?.providers.find(
+			(p) => p.providerId === usedProvider && p.modelName === usedModel,
+		) as ProviderModelMapping | undefined;
+		const supportsStreaming =
+			streamProviderMapping?.streaming ??
+			getModelStreamingSupport(baseModelName, usedProvider);
+
+		if (!isImageGeneration && supportsStreaming === false) {
 			throw new HTTPException(400, {
 				message: `Model ${usedModel} with provider ${usedProvider} does not support streaming`,
 			});

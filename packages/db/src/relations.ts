@@ -26,6 +26,7 @@ export const relations = defineRelations(schema, (r) => ({
 		userOrganizations: r.many.userOrganization(),
 		projects: r.many.project(),
 		providerKeys: r.many.providerKey(),
+		openaiCompatibleProviders: r.many.openaiCompatibleProvider(),
 		referralsGiven: r.many.referral({
 			from: r.organization.id,
 			to: r.referral.referrerOrganizationId,
@@ -101,6 +102,26 @@ export const relations = defineRelations(schema, (r) => ({
 		organization: r.one.organization({
 			from: r.providerKey.organizationId,
 			to: r.organization.id,
+		}),
+	},
+	openaiCompatibleProvider: {
+		organization: r.one.organization({
+			from: r.openaiCompatibleProvider.organizationId,
+			to: r.organization.id,
+		}),
+		keys: r.many.openaiCompatibleProviderKey(),
+		aliases: r.many.openaiCompatibleModelAlias(),
+	},
+	openaiCompatibleProviderKey: {
+		provider: r.one.openaiCompatibleProvider({
+			from: r.openaiCompatibleProviderKey.providerId,
+			to: r.openaiCompatibleProvider.id,
+		}),
+	},
+	openaiCompatibleModelAlias: {
+		provider: r.one.openaiCompatibleProvider({
+			from: r.openaiCompatibleModelAlias.providerId,
+			to: r.openaiCompatibleProvider.id,
 		}),
 	},
 	log: {

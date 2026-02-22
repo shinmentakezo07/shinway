@@ -5086,9 +5086,9 @@ export interface paths {
                                 organizationId: string;
                                 userId: string;
                                 /** @enum {string} */
-                                action: "organization.create" | "organization.update" | "organization.delete" | "project.create" | "project.update" | "project.delete" | "team_member.add" | "team_member.update" | "team_member.remove" | "api_key.create" | "api_key.update_status" | "api_key.update_limit" | "api_key.delete" | "api_key.iam_rule.create" | "api_key.iam_rule.update" | "api_key.iam_rule.delete" | "provider_key.create" | "provider_key.update" | "provider_key.delete" | "subscription.create" | "subscription.cancel" | "subscription.resume" | "subscription.upgrade_yearly" | "payment.method.set_default" | "payment.method.delete" | "payment.credit_topup" | "dev_plan.subscribe" | "dev_plan.cancel" | "dev_plan.resume" | "dev_plan.change_tier" | "dev_plan.update_settings";
+                                action: "organization.create" | "organization.update" | "organization.delete" | "project.create" | "project.update" | "project.delete" | "team_member.add" | "team_member.update" | "team_member.remove" | "api_key.create" | "api_key.update_status" | "api_key.update_limit" | "api_key.delete" | "api_key.iam_rule.create" | "api_key.iam_rule.update" | "api_key.iam_rule.delete" | "provider_key.create" | "provider_key.update" | "provider_key.delete" | "openai_compatible_provider.create" | "openai_compatible_provider.update" | "openai_compatible_provider.delete" | "openai_compatible_provider_key.create" | "openai_compatible_provider_key.update" | "openai_compatible_provider_key.delete" | "openai_compatible_model_alias.create" | "openai_compatible_model_alias.update" | "openai_compatible_model_alias.delete" | "subscription.create" | "subscription.cancel" | "subscription.resume" | "subscription.upgrade_yearly" | "payment.method.set_default" | "payment.method.delete" | "payment.credit_topup" | "dev_plan.subscribe" | "dev_plan.cancel" | "dev_plan.resume" | "dev_plan.change_tier" | "dev_plan.update_settings";
                                 /** @enum {string} */
-                                resourceType: "organization" | "project" | "team_member" | "api_key" | "iam_rule" | "provider_key" | "subscription" | "payment_method" | "payment" | "dev_plan";
+                                resourceType: "organization" | "project" | "team_member" | "api_key" | "iam_rule" | "provider_key" | "openai_compatible_provider" | "openai_compatible_provider_key" | "openai_compatible_model_alias" | "subscription" | "payment_method" | "payment" | "dev_plan";
                                 resourceId: string | null;
                                 metadata?: unknown;
                                 user?: {
@@ -5892,6 +5892,582 @@ export interface paths {
                                 /** @enum {string} */
                                 defaultAction: "block" | "redact" | "warn" | "allow";
                             }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/openai-compatible-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    organizationId?: string;
+                    search?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of OpenAI-compatible providers */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            providers: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                organizationId: string;
+                                name: string;
+                                baseUrl: string;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        organizationId: string;
+                        name: string;
+                        /** Format: uri */
+                        baseUrl: string;
+                        /** @enum {string} */
+                        status?: "active" | "inactive";
+                    };
+                };
+            };
+            responses: {
+                /** @description OpenAI-compatible provider created successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            provider: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                organizationId: string;
+                                name: string;
+                                baseUrl: string;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/openai-compatible-providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OpenAI-compatible provider soft-deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        /** Format: uri */
+                        baseUrl?: string;
+                        /** @enum {string} */
+                        status?: "active" | "inactive";
+                    };
+                };
+            };
+            responses: {
+                /** @description OpenAI-compatible provider updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            provider: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                organizationId: string;
+                                name: string;
+                                baseUrl: string;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/openai-compatible-providers/{id}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List OpenAI-compatible provider keys */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            providerKeys: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                providerId: string;
+                                label: string | null;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                                maskedToken: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        label?: string | null;
+                        /** @enum {string} */
+                        status?: "active" | "inactive";
+                    };
+                };
+            };
+            responses: {
+                /** @description OpenAI-compatible provider key created */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            providerKey: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                providerId: string;
+                                label: string | null;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                                maskedToken: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/openai-compatible-providers/keys/{keyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    keyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OpenAI-compatible provider key soft-deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    keyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        label?: string | null;
+                        /** @enum {string} */
+                        status?: "active" | "inactive";
+                    };
+                };
+            };
+            responses: {
+                /** @description OpenAI-compatible provider key updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            providerKey: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                providerId: string;
+                                label: string | null;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                                maskedToken: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/openai-compatible-providers/{id}/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List OpenAI-compatible model aliases */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            aliases: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                providerId: string;
+                                alias: string;
+                                modelId: string;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        alias: string;
+                        modelId: string;
+                        /** @enum {string} */
+                        status?: "active" | "inactive";
+                    };
+                };
+            };
+            responses: {
+                /** @description OpenAI-compatible model alias created */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            alias: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                providerId: string;
+                                alias: string;
+                                modelId: string;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/openai-compatible-providers/aliases/{aliasId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    aliasId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OpenAI-compatible model alias soft-deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    aliasId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        alias?: string;
+                        modelId?: string;
+                        /** @enum {string} */
+                        status?: "active" | "inactive";
+                    };
+                };
+            };
+            responses: {
+                /** @description OpenAI-compatible model alias updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            alias: {
+                                id: string;
+                                createdAt: string;
+                                updatedAt: string;
+                                providerId: string;
+                                alias: string;
+                                modelId: string;
+                                /** @enum {string} */
+                                status: "active" | "inactive" | "deleted";
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/openai-compatible-providers/{id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List models from provider /v1/models endpoint */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            models: {
+                                id: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Upstream provider request failed */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
                         };
                     };
                 };

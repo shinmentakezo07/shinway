@@ -1,0 +1,1 @@
+CREATE INDEX "openai_compatible_model_alias_provider_id_alias_idx" ON "openai_compatible_model_alias" ("provider_id","alias");
