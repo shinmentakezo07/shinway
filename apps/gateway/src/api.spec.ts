@@ -39,6 +39,9 @@ describe("test", () => {
 			db.delete(tables.log),
 			db.delete(tables.apiKey),
 			db.delete(tables.providerKey),
+			db.delete(tables.openaiCompatibleModelAlias),
+			db.delete(tables.openaiCompatibleProviderKey),
+			db.delete(tables.openaiCompatibleProvider),
 		]);
 
 		await Promise.all([
@@ -106,13 +109,21 @@ describe("test", () => {
 			createdBy: "user-id",
 		});
 
-		// Create provider key with mock server URL as baseUrl
-		await db.insert(tables.providerKey).values({
-			id: "provider-key-id",
-			token: "sk-test-key",
-			provider: "llmgateway",
+		// Create OpenAI-compatible provider with mock server URL as baseUrl
+		await db.insert(tables.openaiCompatibleProvider).values({
+			id: "openai-compatible-provider-id",
 			organizationId: "org-id",
+			name: "testprovider",
 			baseUrl: mockServerUrl,
+			status: "active",
+		});
+
+		await db.insert(tables.openaiCompatibleProviderKey).values({
+			id: "openai-compatible-provider-key-id",
+			providerId: "openai-compatible-provider-id",
+			token: "sk-test-key",
+			label: "primary",
+			status: "active",
 		});
 
 		const res = await app.request("/v1/chat/completions", {
@@ -122,7 +133,7 @@ describe("test", () => {
 				Authorization: `Bearer real-token`,
 			},
 			body: JSON.stringify({
-				model: "llmgateway/custom",
+				model: "testprovider/custom",
 				messages: [
 					{
 						role: "user",
@@ -136,6 +147,7 @@ describe("test", () => {
 		expect(res.status).toBe(200);
 		expect(json).toHaveProperty("choices.[0].message.content");
 		expect(json.choices[0].message.content).toMatch(/Hello!/);
+		expect(json.model).toBe("custom/custom");
 
 		// Wait for the worker to process the log and check that the request was logged
 		const logs = await waitForLogs(1);
@@ -502,7 +514,7 @@ describe("test", () => {
 	});
 
 	// test for provider error response and error logging
-	test("/v1/chat/completions with provider error response", async () => {
+	test("/v1/chat/completions with provider error response (new custom provider tables)", async () => {
 		await db.insert(tables.apiKey).values({
 			id: "token-id",
 			token: "real-token",
@@ -511,13 +523,21 @@ describe("test", () => {
 			createdBy: "user-id",
 		});
 
-		// Create provider key with mock server URL as baseUrl
-		await db.insert(tables.providerKey).values({
-			id: "provider-key-id",
-			token: "sk-test-key",
-			provider: "llmgateway",
+		// Create OpenAI-compatible provider with mock server URL as baseUrl
+		await db.insert(tables.openaiCompatibleProvider).values({
+			id: "openai-compatible-provider-id",
 			organizationId: "org-id",
+			name: "testprovider",
 			baseUrl: mockServerUrl,
+			status: "active",
+		});
+
+		await db.insert(tables.openaiCompatibleProviderKey).values({
+			id: "openai-compatible-provider-key-id",
+			providerId: "openai-compatible-provider-id",
+			token: "sk-test-key",
+			label: "primary",
+			status: "active",
 		});
 
 		// Send a request that will trigger an error in the mock server
@@ -528,7 +548,7 @@ describe("test", () => {
 				Authorization: `Bearer real-token`,
 			},
 			body: JSON.stringify({
-				model: "llmgateway/custom",
+				model: "testprovider/custom",
 				messages: [
 					{
 						role: "user",
@@ -641,7 +661,7 @@ describe("test", () => {
 		expect(res.status).toBe(401);
 	});
 
-	test("/v1/chat/completions with custom X-LLMGateway headers", async () => {
+	test("/v1/chat/completions with custom X-LLMGateway headers (new custom provider tables)", async () => {
 		await db.insert(tables.apiKey).values({
 			id: "token-id",
 			token: "real-token",
@@ -650,13 +670,21 @@ describe("test", () => {
 			createdBy: "user-id",
 		});
 
-		// Create provider key with mock server URL as baseUrl
-		await db.insert(tables.providerKey).values({
-			id: "provider-key-id",
-			token: "sk-test-key",
-			provider: "llmgateway",
+		// Create OpenAI-compatible provider with mock server URL as baseUrl
+		await db.insert(tables.openaiCompatibleProvider).values({
+			id: "openai-compatible-provider-id",
 			organizationId: "org-id",
+			name: "testprovider",
 			baseUrl: mockServerUrl,
+			status: "active",
+		});
+
+		await db.insert(tables.openaiCompatibleProviderKey).values({
+			id: "openai-compatible-provider-key-id",
+			providerId: "openai-compatible-provider-id",
+			token: "sk-test-key",
+			label: "primary",
+			status: "active",
 		});
 
 		const res = await app.request("/v1/chat/completions", {
@@ -669,7 +697,7 @@ describe("test", () => {
 				"X-LLMGateway-Environment": "production",
 			},
 			body: JSON.stringify({
-				model: "llmgateway/custom",
+				model: "testprovider/custom",
 				messages: [
 					{
 						role: "user",
@@ -793,12 +821,20 @@ describe("test", () => {
 				createdBy: "user-id",
 			});
 
-			await db.insert(tables.providerKey).values({
-				id: "provider-key-id",
-				token: "sk-test-key",
-				provider: "llmgateway",
+			await db.insert(tables.openaiCompatibleProvider).values({
+				id: "openai-compatible-provider-id",
 				organizationId: "org-id",
+				name: "testprovider",
 				baseUrl: mockServerUrl,
+				status: "active",
+			});
+
+			await db.insert(tables.openaiCompatibleProviderKey).values({
+				id: "openai-compatible-provider-key-id",
+				providerId: "openai-compatible-provider-id",
+				token: "sk-test-key",
+				label: "primary",
+				status: "active",
 			});
 
 			// Request that triggers a 5 second delay (longer than our 2s timeout)
@@ -809,7 +845,7 @@ describe("test", () => {
 					Authorization: `Bearer real-token`,
 				},
 				body: JSON.stringify({
-					model: "llmgateway/custom",
+					model: "testprovider/custom",
 					messages: [
 						{
 							role: "user",
@@ -845,12 +881,20 @@ describe("test", () => {
 				createdBy: "user-id",
 			});
 
-			await db.insert(tables.providerKey).values({
-				id: "provider-key-id",
-				token: "sk-test-key",
-				provider: "llmgateway",
+			await db.insert(tables.openaiCompatibleProvider).values({
+				id: "openai-compatible-provider-id",
 				organizationId: "org-id",
+				name: "testprovider",
 				baseUrl: mockServerUrl,
+				status: "active",
+			});
+
+			await db.insert(tables.openaiCompatibleProviderKey).values({
+				id: "openai-compatible-provider-key-id",
+				providerId: "openai-compatible-provider-id",
+				token: "sk-test-key",
+				label: "primary",
+				status: "active",
 			});
 
 			// Request that triggers a 5 second delay (longer than our 2s timeout)
@@ -861,7 +905,7 @@ describe("test", () => {
 					Authorization: `Bearer real-token`,
 				},
 				body: JSON.stringify({
-					model: "llmgateway/custom",
+					model: "testprovider/custom",
 					messages: [
 						{
 							role: "user",
@@ -904,12 +948,20 @@ describe("test", () => {
 				createdBy: "user-id",
 			});
 
-			await db.insert(tables.providerKey).values({
-				id: "provider-key-id",
-				token: "sk-test-key",
-				provider: "llmgateway",
+			await db.insert(tables.openaiCompatibleProvider).values({
+				id: "openai-compatible-provider-id",
 				organizationId: "org-id",
+				name: "testprovider",
 				baseUrl: mockServerUrl,
+				status: "active",
+			});
+
+			await db.insert(tables.openaiCompatibleProviderKey).values({
+				id: "openai-compatible-provider-key-id",
+				providerId: "openai-compatible-provider-id",
+				token: "sk-test-key",
+				label: "primary",
+				status: "active",
 			});
 
 			// Request that triggers only 500ms delay (under our 2s timeout)
@@ -920,7 +972,7 @@ describe("test", () => {
 					Authorization: `Bearer real-token`,
 				},
 				body: JSON.stringify({
-					model: "llmgateway/custom",
+					model: "testprovider/custom",
 					messages: [
 						{
 							role: "user",

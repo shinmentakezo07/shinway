@@ -12,12 +12,17 @@
  */
 import {
 	and,
+	asc,
 	eq,
 	inArray,
+	ne,
 	cdb as db,
 	db as uncachedDb,
 	apiKey as apiKeyTable,
 	apiKeyIamRule as apiKeyIamRuleTable,
+	openaiCompatibleModelAlias as openaiCompatibleModelAliasTable,
+	openaiCompatibleProvider as openaiCompatibleProviderTable,
+	openaiCompatibleProviderKey as openaiCompatibleProviderKeyTable,
 	organization as organizationTable,
 	project as projectTable,
 	providerKey as providerKeyTable,
@@ -29,6 +34,8 @@ import type { InferSelectModel } from "@llmgateway/db";
 import type {
 	apiKey,
 	apiKeyIamRule,
+	openaiCompatibleModelAlias,
+	openaiCompatibleProvider,
 	organization,
 	project,
 	providerKey,
@@ -39,6 +46,12 @@ import type {
 // Type aliases for cleaner function signatures
 type ApiKey = InferSelectModel<typeof apiKey>;
 type ApiKeyIamRule = InferSelectModel<typeof apiKeyIamRule>;
+type OpenAICompatibleModelAlias = InferSelectModel<
+	typeof openaiCompatibleModelAlias
+>;
+type OpenAICompatibleProvider = InferSelectModel<
+	typeof openaiCompatibleProvider
+>;
 type Organization = InferSelectModel<typeof organization>;
 type Project = InferSelectModel<typeof project>;
 type ProviderKey = InferSelectModel<typeof providerKey>;
@@ -121,13 +134,100 @@ export async function findOrganizationById(
 }
 
 /**
- * Find a custom provider key by organization, provider, and name (cacheable)
+ * Find an active OpenAI-compatible provider by organization and name (cacheable)
+ */
+export async function findOpenAICompatibleProvider(
+	organizationId: string,
+	providerName: string,
+): Promise<OpenAICompatibleProvider | undefined> {
+	const results = await db
+		.select()
+		.from(openaiCompatibleProviderTable)
+		.where(
+			and(
+				eq(openaiCompatibleProviderTable.organizationId, organizationId),
+				eq(openaiCompatibleProviderTable.status, "active"),
+				eq(openaiCompatibleProviderTable.name, providerName),
+			),
+		)
+		.limit(1);
+	return results[0];
+}
+
+/**
+ * Find active aliases for an OpenAI-compatible provider (cacheable)
+ */
+export async function findOpenAICompatibleProviderAliases(
+	providerId: string,
+): Promise<OpenAICompatibleModelAlias[]> {
+	return await db
+		.select()
+		.from(openaiCompatibleModelAliasTable)
+		.where(
+			and(
+				eq(openaiCompatibleModelAliasTable.providerId, providerId),
+				eq(openaiCompatibleModelAliasTable.status, "active"),
+			),
+		);
+}
+
+/**
+ * Find a custom provider key by organization and provider name (cacheable)
+ *
+ * Lookup order:
+ * 1) New OpenAI-compatible provider domain tables
+ * 2) Legacy provider_key custom-provider entry (fallback)
  */
 export async function findCustomProviderKey(
 	organizationId: string,
 	customProviderName: string,
 ): Promise<ProviderKey | undefined> {
-	const results = await db
+	const openaiCompatibleProviders = await db
+		.select({
+			provider: openaiCompatibleProviderTable,
+			providerKey: openaiCompatibleProviderKeyTable,
+		})
+		.from(openaiCompatibleProviderTable)
+		.innerJoin(
+			openaiCompatibleProviderKeyTable,
+			eq(
+				openaiCompatibleProviderKeyTable.providerId,
+				openaiCompatibleProviderTable.id,
+			),
+		)
+		.where(
+			and(
+				eq(openaiCompatibleProviderTable.organizationId, organizationId),
+				eq(openaiCompatibleProviderTable.name, customProviderName),
+				ne(openaiCompatibleProviderTable.status, "deleted"),
+				eq(openaiCompatibleProviderKeyTable.status, "active"),
+			),
+		)
+		.orderBy(
+			asc(openaiCompatibleProviderKeyTable.createdAt),
+			asc(openaiCompatibleProviderKeyTable.id),
+		)
+		.limit(1);
+
+	const openaiCompatibleMatch = openaiCompatibleProviders[0];
+	if (openaiCompatibleMatch) {
+		const provider = openaiCompatibleMatch.provider;
+		const providerKey = openaiCompatibleMatch.providerKey;
+		return {
+			id: providerKey.id,
+			createdAt: providerKey.createdAt,
+			updatedAt: providerKey.updatedAt,
+			token: providerKey.token,
+			provider: "custom",
+			name: provider.name,
+			baseUrl: provider.baseUrl,
+			options: null,
+			status: providerKey.status,
+			organizationId: provider.organizationId,
+		};
+	}
+
+	const legacyResults = await db
 		.select()
 		.from(providerKeyTable)
 		.where(
@@ -139,7 +239,7 @@ export async function findCustomProviderKey(
 			),
 		)
 		.limit(1);
-	return results[0];
+	return legacyResults[0];
 }
 
 /**

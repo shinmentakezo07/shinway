@@ -400,6 +400,103 @@ export const providerKey = pgTable(
 	],
 );
 
+export const openaiCompatibleProvider = pgTable(
+	"openai_compatible_provider",
+	{
+		id: text().primaryKey().notNull().$defaultFn(shortid),
+		createdAt: timestamp().notNull().defaultNow(),
+		updatedAt: timestamp()
+			.notNull()
+			.defaultNow()
+			.$onUpdate(() => new Date()),
+		organizationId: text()
+			.notNull()
+			.references(() => organization.id, { onDelete: "cascade" }),
+		name: text().notNull(),
+		baseUrl: text().notNull(),
+		status: text({
+			enum: ["active", "inactive", "deleted"],
+		})
+			.notNull()
+			.default("active"),
+	},
+	(table) => [
+		unique().on(table.organizationId, table.name),
+		index("openai_compatible_provider_organization_id_idx").on(
+			table.organizationId,
+		),
+		index("openai_compatible_provider_organization_id_status_idx").on(
+			table.organizationId,
+			table.status,
+		),
+	],
+);
+
+export const openaiCompatibleProviderKey = pgTable(
+	"openai_compatible_provider_key",
+	{
+		id: text().primaryKey().notNull().$defaultFn(shortid),
+		createdAt: timestamp().notNull().defaultNow(),
+		updatedAt: timestamp()
+			.notNull()
+			.defaultNow()
+			.$onUpdate(() => new Date()),
+		providerId: text()
+			.notNull()
+			.references(() => openaiCompatibleProvider.id, { onDelete: "cascade" }),
+		token: text().notNull(),
+		label: text(),
+		status: text({
+			enum: ["active", "inactive", "deleted"],
+		})
+			.notNull()
+			.default("active"),
+	},
+	(table) => [
+		index("openai_compatible_provider_key_provider_id_idx").on(
+			table.providerId,
+		),
+		index("openai_compatible_provider_key_provider_id_status_idx").on(
+			table.providerId,
+			table.status,
+		),
+	],
+);
+
+export const openaiCompatibleModelAlias = pgTable(
+	"openai_compatible_model_alias",
+	{
+		id: text().primaryKey().notNull().$defaultFn(shortid),
+		createdAt: timestamp().notNull().defaultNow(),
+		updatedAt: timestamp()
+			.notNull()
+			.defaultNow()
+			.$onUpdate(() => new Date()),
+		providerId: text()
+			.notNull()
+			.references(() => openaiCompatibleProvider.id, { onDelete: "cascade" }),
+		alias: text().notNull(),
+		modelId: text().notNull(),
+		status: text({
+			enum: ["active", "inactive", "deleted"],
+		})
+			.notNull()
+			.default("active"),
+	},
+	(table) => [
+		unique().on(table.providerId, table.alias),
+		index("openai_compatible_model_alias_provider_id_idx").on(table.providerId),
+		index("openai_compatible_model_alias_provider_id_alias_idx").on(
+			table.providerId,
+			table.alias,
+		),
+		index("openai_compatible_model_alias_provider_id_status_idx").on(
+			table.providerId,
+			table.status,
+		),
+	],
+);
+
 export const log = pgTable(
 	"log",
 	{
@@ -925,6 +1022,16 @@ export const auditLogActions = [
 	"provider_key.create",
 	"provider_key.update",
 	"provider_key.delete",
+	// OpenAI-compatible Provider
+	"openai_compatible_provider.create",
+	"openai_compatible_provider.update",
+	"openai_compatible_provider.delete",
+	"openai_compatible_provider_key.create",
+	"openai_compatible_provider_key.update",
+	"openai_compatible_provider_key.delete",
+	"openai_compatible_model_alias.create",
+	"openai_compatible_model_alias.update",
+	"openai_compatible_model_alias.delete",
 	// Subscription
 	"subscription.create",
 	"subscription.cancel",
@@ -949,6 +1056,9 @@ export const auditLogResourceTypes = [
 	"api_key",
 	"iam_rule",
 	"provider_key",
+	"openai_compatible_provider",
+	"openai_compatible_provider_key",
+	"openai_compatible_model_alias",
 	"subscription",
 	"payment_method",
 	"payment",
