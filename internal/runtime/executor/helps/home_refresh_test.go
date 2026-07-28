@@ -39,7 +39,7 @@ func (c *fakeHomeRefreshClient) GetRefreshAuth(_ context.Context, authIndex stri
 func TestRefreshAuthViaHomeAcceptsAuthEnvelope(t *testing.T) {
 	raw, errMarshal := json.Marshal(struct {
 		Auth      shinwayauth.Auth `json:"auth"`
-		AuthIndex string            `json:"auth_index"`
+		AuthIndex string           `json:"auth_index"`
 	}{
 		Auth: shinwayauth.Auth{
 			ID:       "home-auth-1",

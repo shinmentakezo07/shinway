@@ -9,8 +9,8 @@ import (
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestRegisterCommandLineFlagsSkipsNativeAndUsesPriority(t *testing.T) {

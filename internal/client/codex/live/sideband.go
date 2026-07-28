@@ -17,9 +17,9 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
 	"github.com/shinmentakezo07/shinway/v7/internal/logging"
 	"github.com/shinmentakezo07/shinway/v7/internal/runtime/executor/helps"
+	"github.com/shinmentakezo07/shinway/v7/sdk/proxyutil"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	"github.com/shinmentakezo07/shinway/v7/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
 	xproxy "golang.org/x/net/proxy"
 )

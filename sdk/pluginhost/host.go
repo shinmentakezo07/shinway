@@ -6,8 +6,8 @@ import (
 	internalconfig "github.com/shinmentakezo07/shinway/v7/internal/config"
 	internalpluginhost "github.com/shinmentakezo07/shinway/v7/internal/pluginhost"
 	internalregistry "github.com/shinmentakezo07/shinway/v7/internal/registry"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"gopkg.in/yaml.v3"
 )
 

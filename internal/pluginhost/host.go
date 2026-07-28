@@ -12,9 +12,9 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
 	"github.com/shinmentakezo07/shinway/v7/internal/interfaces"
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginabi"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

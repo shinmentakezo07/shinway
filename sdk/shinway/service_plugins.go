@@ -10,9 +10,9 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 	sdkaccess "github.com/shinmentakezo07/shinway/v7/sdk/access"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
+	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/usage"
-	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	sdktranslator "github.com/shinmentakezo07/shinway/v7/sdk/translator"
 	log "github.com/sirupsen/logrus"
 )

@@ -32,7 +32,7 @@ type homeErrorEnvelope struct {
 
 type homeRefreshAuthEnvelope struct {
 	Auth      shinwayauth.Auth `json:"auth"`
-	AuthIndex string            `json:"auth_index"`
+	AuthIndex string           `json:"auth_index"`
 }
 
 type homeErrorDetail struct {

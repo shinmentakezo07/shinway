@@ -11,9 +11,9 @@ import (
 	internalconfig "github.com/shinmentakezo07/shinway/v7/internal/config"
 	"github.com/shinmentakezo07/shinway/v7/internal/home"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
+	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/executionregistry"
 	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
 )
 
 type schedulerTestExecutor struct {

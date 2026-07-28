@@ -36,8 +36,8 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/tui"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdkpluginstore "github.com/shinmentakezo07/shinway/v7/sdk/pluginstore"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

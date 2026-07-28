@@ -7,8 +7,8 @@ import (
 
 	"github.com/shinmentakezo07/shinway/v7/internal/constant"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 // registerModelsForAuth (re)binds provider models in the global registry using the core auth ID as client identifier.

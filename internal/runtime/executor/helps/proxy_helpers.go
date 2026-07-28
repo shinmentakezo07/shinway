@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
-	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/proxyutil"
+	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	internalmanagement "github.com/shinmentakezo07/shinway/v7/internal/api/handlers/management"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 // Handler re-exports the management handler used by the internal HTTP API.

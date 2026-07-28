@@ -13,9 +13,9 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers"
+	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
 )
 
 type compactCaptureExecutor struct {

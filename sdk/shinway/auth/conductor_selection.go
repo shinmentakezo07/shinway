@@ -11,8 +11,8 @@ import (
 
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 	"github.com/shinmentakezo07/shinway/v7/internal/thinking"
-	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 )
 
 func (m *Manager) SetPluginScheduler(scheduler PluginScheduler) {

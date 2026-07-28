@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestOpenAIResponsesForwardsInvalidReasoningEncryptedContentToExecutor(t *testing.T) {

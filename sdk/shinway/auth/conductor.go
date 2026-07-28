@@ -8,8 +8,8 @@ import (
 	"time"
 
 	internalconfig "github.com/shinmentakezo07/shinway/v7/internal/config"
-	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 )
 
 // ProviderExecutor defines the contract required by Manager to execute provider calls.

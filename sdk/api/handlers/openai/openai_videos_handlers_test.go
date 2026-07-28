@@ -14,9 +14,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 	apihandlers "github.com/shinmentakezo07/shinway/v7/sdk/api/handlers"
+	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
 	"github.com/tidwall/gjson"
 )
 

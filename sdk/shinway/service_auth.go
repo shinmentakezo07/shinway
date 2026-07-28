@@ -10,8 +10,8 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/watcher"
 	"github.com/shinmentakezo07/shinway/v7/internal/wsrelay"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

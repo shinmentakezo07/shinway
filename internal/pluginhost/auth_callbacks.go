@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 type rpcHostAuthGetRequest struct {

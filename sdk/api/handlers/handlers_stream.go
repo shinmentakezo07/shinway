@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/interfaces"
-	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	sdktranslator "github.com/shinmentakezo07/shinway/v7/sdk/translator"
 	"golang.org/x/net/context"
 )

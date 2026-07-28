@@ -14,8 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 // PluginAuthParser parses auth JSON owned by plugin providers.

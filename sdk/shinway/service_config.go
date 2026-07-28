@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/watcher/synthesizer"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	internalregistry "github.com/shinmentakezo07/shinway/v7/internal/registry"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T) {

@@ -34,8 +34,8 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/logging"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	sdkauth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/proxyutil"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -117,6 +118,9 @@ func autoUpdateSkipReason(cfg *config.Config) (string, bool) {
 	if cfg.RemoteManagement.DisableAutoUpdatePanel {
 		return "disable-auto-update-panel is enabled", true
 	}
+	if localWebDir() != "" {
+		return "local web source present", true
+	}
 	return "", false
 }
 
@@ -170,7 +174,13 @@ func StaticDir(configFilePath string) string {
 }
 
 // FilePath resolves the absolute path to the management control panel asset.
+// The local web source checkout (web/ next to the repository root) takes
+// priority over the downloadable management asset when present.
 func FilePath(configFilePath string) string {
+	if localPath := localWebAssetPath(); localPath != "" {
+		return localPath
+	}
+
 	if override := strings.TrimSpace(os.Getenv("MANAGEMENT_STATIC_PATH")); override != "" {
 		cleaned := filepath.Clean(override)
 		if strings.EqualFold(filepath.Base(cleaned), managementAssetName) {
@@ -186,11 +196,114 @@ func FilePath(configFilePath string) string {
 	return filepath.Join(dir, ManagementFileName)
 }
 
+// localWebDir returns the directory containing the local management panel
+// source checkout. Resolution order:
+//  1. MANAGEMENT_LOCAL_WEB_PATH environment override
+//  2. <working directory>/web
+//  3. <executable directory>/web
+//
+// The search stops at the first candidate that exists. Returns "" when the
+// local web source is absent.
+func localWebDir() string {
+	if override := strings.TrimSpace(os.Getenv("MANAGEMENT_LOCAL_WEB_PATH")); override != "" {
+		cleaned := filepath.Clean(override)
+		if info, err := os.Stat(cleaned); err == nil && info.IsDir() {
+			return cleaned
+		}
+		return ""
+	}
+
+	candidates := make([]string, 0, 2)
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, filepath.Join(wd, "web"))
+	}
+	if exePath, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exePath), "web"))
+	}
+
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// localWebAssetPath returns the absolute path to the built single-file asset
+// produced by the local web source, or "" when the local web source is not
+// available.
+func localWebAssetPath() string {
+	dir := localWebDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, "dist", "index.html")
+}
+
+// ensureLocalWebAsset attempts to build the local management panel when the
+// built asset is missing. Returns the asset path when it ends up available,
+// or "" otherwise. Build failures are non-fatal and leave the fallback
+// management asset pipeline to handle serving.
+func ensureLocalWebAsset() string {
+	assetPath := localWebAssetPath()
+	if assetPath == "" {
+		return ""
+	}
+	if _, err := os.Stat(assetPath); err == nil {
+		return assetPath
+	}
+
+	dir := localWebDir()
+	if dir == "" {
+		return ""
+	}
+
+	if _, err := exec.LookPath("bun"); err != nil {
+		log.Debug("management asset local web build skipped: bun not found in PATH")
+		return ""
+	}
+
+	log.Info("building management panel from local web source")
+	if output, err := runBun(dir, "install", "--frozen-lockfile"); err != nil {
+		log.WithError(err).Warnf("management asset local web install failed: %s", strings.TrimSpace(string(output)))
+		return ""
+	}
+	if output, err := runBun(dir, "run", "build"); err != nil {
+		log.WithError(err).Warnf("management asset local web build failed: %s", strings.TrimSpace(string(output)))
+		return ""
+	}
+
+	if _, err := os.Stat(assetPath); err != nil {
+		log.WithError(err).Warn("management asset local web build did not produce dist/index.html")
+		return ""
+	}
+	log.Info("management panel built from local web source")
+	return assetPath
+}
+
+func runBun(dir string, args ...string) ([]byte, error) {
+	cmd := exec.Command("bun", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "CI=1")
+	return cmd.CombinedOutput()
+}
+
 // EnsureLatestManagementHTML checks the latest management.html asset and updates the local copy when needed.
 // It coalesces concurrent sync attempts and returns whether the asset exists after the sync attempt.
+// When a local web source checkout is present, it takes priority and the
+// remote GitHub/fallback downloads are skipped entirely.
 func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL string, panelRepository string) bool {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+
+	if localWebDir() != "" {
+		return ensureLocalWebAsset() != ""
 	}
 
 	staticDir = strings.TrimSpace(staticDir)

@@ -19,11 +19,11 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/interfaces"
 	"github.com/shinmentakezo07/shinway/v7/internal/logging"
 	"github.com/shinmentakezo07/shinway/v7/internal/thinking"
+	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	coresession "github.com/shinmentakezo07/shinway/v7/sdk/shinway/session"
 	coreusage "github.com/shinmentakezo07/shinway/v7/sdk/shinway/usage"
-	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	"github.com/tidwall/gjson"
 	"golang.org/x/net/context"
 )

@@ -7,9 +7,9 @@ import (
 
 	internalconfig "github.com/shinmentakezo07/shinway/v7/internal/config"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
+	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/executionregistry"
-	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 )
 
 func TestServiceApplyCoreAuthAddOrUpdate_DeleteReAddDoesNotInheritStaleRuntimeState(t *testing.T) {

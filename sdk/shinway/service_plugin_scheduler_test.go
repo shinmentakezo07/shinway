@@ -7,8 +7,8 @@ import (
 	"unsafe"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/pluginhost"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestBuilderBuildInjectsPluginHostScheduler(t *testing.T) {

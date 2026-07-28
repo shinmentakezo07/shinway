@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdktranslator "github.com/shinmentakezo07/shinway/v7/sdk/translator"
 	_ "github.com/shinmentakezo07/shinway/v7/sdk/translator/builtin"
 	log "github.com/sirupsen/logrus"

@@ -9,8 +9,8 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/interfaces"
 	"github.com/shinmentakezo07/shinway/v7/internal/thinking"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
-	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	"golang.org/x/net/context"
 )
 

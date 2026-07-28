@@ -16,9 +16,9 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/redisqueue"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	"github.com/shinmentakezo07/shinway/v7/internal/watcher/diff"
+	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/executionregistry"
-	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestGetRequestDetails_PreservesSuffix(t *testing.T) {

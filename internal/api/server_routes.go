@@ -25,9 +25,9 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers/claude"
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers/gemini"
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers/openai"
+	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
 	log "github.com/sirupsen/logrus"
 )
 

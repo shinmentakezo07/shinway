@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
-	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
+	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestNewProxyAwareHTTPClientDirectBypassesGlobalProxy(t *testing.T) {

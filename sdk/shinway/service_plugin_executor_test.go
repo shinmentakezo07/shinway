@@ -3,8 +3,8 @@ package shinway
 import (
 	"testing"
 
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestHasNativeOpenAICompatExecutorConfig(t *testing.T) {

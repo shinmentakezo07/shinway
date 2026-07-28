@@ -7,9 +7,9 @@ import (
 
 	"github.com/shinmentakezo07/shinway/v7/internal/pluginhost"
 	runtimeexecutor "github.com/shinmentakezo07/shinway/v7/internal/runtime/executor"
+	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 )
 
 type serviceTestPluginExecutor struct{}

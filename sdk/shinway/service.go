@@ -16,10 +16,10 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/wsrelay"
 	sdkaccess "github.com/shinmentakezo07/shinway/v7/sdk/access"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
-	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/executionregistry"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	sdkpluginstore "github.com/shinmentakezo07/shinway/v7/sdk/pluginstore"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
+	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/executionregistry"
 )
 
 // Service wraps the proxy server lifecycle so external programs can embed the CLI proxy.

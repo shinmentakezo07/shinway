@@ -17,9 +17,9 @@ import (
 	internalcache "github.com/shinmentakezo07/shinway/v7/internal/cache"
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
+	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
 	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
-	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
 	sdktranslator "github.com/shinmentakezo07/shinway/v7/sdk/translator"
 	"github.com/tidwall/gjson"
 )

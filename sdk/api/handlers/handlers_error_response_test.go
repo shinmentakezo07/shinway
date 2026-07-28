@@ -11,8 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shinmentakezo07/shinway/v7/internal/interfaces"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestWriteErrorResponse_AddonHeadersDisabledByDefault(t *testing.T) {

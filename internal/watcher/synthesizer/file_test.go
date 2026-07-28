@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestNewFileSynthesizer(t *testing.T) {

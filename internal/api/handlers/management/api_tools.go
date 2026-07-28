@@ -12,8 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/proxyutil"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	log "github.com/sirupsen/logrus"
 )
 

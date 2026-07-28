@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shinmentakezo07/shinway/v7/internal/logging"
+	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	coresession "github.com/shinmentakezo07/shinway/v7/sdk/shinway/session"
-	"github.com/shinmentakezo07/shinway/v7/sdk/config"
 	"golang.org/x/net/context"
 )
 

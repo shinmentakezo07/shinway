@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
+	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 func TestExtractAccessToken(t *testing.T) {
@@ -154,7 +154,7 @@ func TestFileTokenStoreSaveRejectsInvalidWeight(t *testing.T) {
 		ID:       "invalid.json",
 		FileName: "invalid.json",
 		Metadata: map[string]any{
-			"type":                       "test",
+			"type":                      "test",
 			shinwayauth.AttributeWeight: 1.5,
 		},
 	}

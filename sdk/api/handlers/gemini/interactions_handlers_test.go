@@ -16,8 +16,8 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/runtime/executor"
 	_ "github.com/shinmentakezo07/shinway/v7/internal/translator"
 	"github.com/shinmentakezo07/shinway/v7/sdk/api/handlers"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	sdkconfig "github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/tidwall/gjson"
 )
 

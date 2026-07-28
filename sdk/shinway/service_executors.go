@@ -7,8 +7,8 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/constant"
 	"github.com/shinmentakezo07/shinway/v7/internal/runtime/executor"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
-	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/config"
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
 
 type openAICompatibilityRegistrationCache struct {

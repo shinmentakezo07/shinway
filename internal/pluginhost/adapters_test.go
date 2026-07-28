@@ -16,10 +16,10 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
 	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 	sdkaccess "github.com/shinmentakezo07/shinway/v7/sdk/access"
+	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	coreexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
 	coreusage "github.com/shinmentakezo07/shinway/v7/sdk/shinway/usage"
-	"github.com/shinmentakezo07/shinway/v7/sdk/pluginapi"
 	sdktranslator "github.com/shinmentakezo07/shinway/v7/sdk/translator"
 )
 
