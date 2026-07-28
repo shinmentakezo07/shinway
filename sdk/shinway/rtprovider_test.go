@@ -1,0 +1,22 @@
+package shinway
+
+import (
+	"net/http"
+	"testing"
+
+	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
+)
+
+func TestRoundTripperForDirectBypassesProxy(t *testing.T) {
+	t.Parallel()
+
+	provider := newDefaultRoundTripperProvider()
+	rt := provider.RoundTripperFor(&coreauth.Auth{ProxyURL: "direct"})
+	transport, ok := rt.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport type = %T, want *http.Transport", rt)
+	}
+	if transport.Proxy != nil {
+		t.Fatal("expected direct transport to disable proxy function")
+	}
+}
