@@ -34,6 +34,7 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/store"
 	_ "github.com/shinmentakezo07/shinway/v7/internal/translator"
 	"github.com/shinmentakezo07/shinway/v7/internal/tui"
+	"github.com/shinmentakezo07/shinway/v7/internal/usagestore"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
 	sdkpluginstore "github.com/shinmentakezo07/shinway/v7/sdk/pluginstore"
@@ -559,6 +560,13 @@ func main() {
 	redisqueue.SetRetentionSeconds(cfg.RedisUsageQueueRetentionSeconds)
 	coreauth.SetQuotaCooldownDisabled(cfg.DisableCooling)
 	coreauth.SetTransientErrorCooldownSeconds(cfg.TransientErrorCooldownSeconds)
+
+	// The persistent usage store is independent of the redis queue toggle so
+	// the management dashboard always has data. Recording can be disabled at
+	// runtime via the management API.
+	if _, errUsageStore := usagestore.Open(cfg.AuthDir); errUsageStore != nil {
+		log.WithError(errUsageStore).Warn("failed to initialize usage store, analytics disabled")
+	}
 
 	if err = logging.ConfigureLogOutput(cfg); err != nil {
 		log.Errorf("failed to configure log output: %v", err)

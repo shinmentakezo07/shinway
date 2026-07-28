@@ -283,6 +283,14 @@ export function IconChevronLeft({ size = 20, ...props }: IconProps) {
   );
 }
 
+export function IconChevronRight({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...baseSvgProps} width={size} height={size} {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 export function IconSearch({ size = 20, ...props }: IconProps) {
   return (
     <svg {...baseSvgProps} width={size} height={size} {...props}>
@@ -470,6 +478,21 @@ export function IconSidebarQuota({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+export function IconChart({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...baseSvgProps} width={size} height={size} {...props}>
+      <line x1="3" y1="3" x2="3" y2="21" />
+      <line x1="3" y1="21" x2="21" y2="21" />
+      <line x1="7" y1="14" x2="7" y2="17" />
+      <line x1="11" y1="10" x2="11" y2="17" />
+      <line x1="15" y1="13" x2="15" y2="17" />
+      <line x1="19" y1="7" x2="19" y2="17" />
+    </svg>
+  );
+}
+
+export const IconSidebarUsage = IconChart;
 
 export const IconSidebarLogs = IconScrollText;
 

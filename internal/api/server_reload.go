@@ -11,6 +11,7 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/logging"
 	"github.com/shinmentakezo07/shinway/v7/internal/managementasset"
 	"github.com/shinmentakezo07/shinway/v7/internal/redisqueue"
+	"github.com/shinmentakezo07/shinway/v7/internal/usagestore"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
 	"github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
@@ -86,6 +87,17 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 
 	if oldCfg == nil || oldCfg.UsageStatisticsEnabled != cfg.UsageStatisticsEnabled {
 		redisqueue.SetUsageStatisticsEnabled(cfg.UsageStatisticsEnabled)
+	}
+
+	// Reopen the persistent usage store if the auth directory changed so the
+	// SQLite database stays colocated with credentials.
+	if oldCfg == nil || oldCfg.AuthDir != cfg.AuthDir {
+		resolvedAuthDir, errResolve := util.ResolveAuthDir(cfg.AuthDir)
+		if errResolve != nil {
+			log.WithError(errResolve).Warn("failed to resolve auth dir for usage store")
+		} else if _, errOpen := usagestore.Open(resolvedAuthDir); errOpen != nil {
+			log.WithError(errOpen).Warn("failed to reopen usage store after auth dir change")
+		}
 	}
 
 	if oldCfg == nil || oldCfg.RedisUsageQueueRetentionSeconds != cfg.RedisUsageQueueRetentionSeconds {
