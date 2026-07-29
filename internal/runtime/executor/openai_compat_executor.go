@@ -40,10 +40,12 @@ type OpenAICompatExecutor struct {
 	provider string
 	cfg      *config.Config
 	// translateHook, when non-nil, is invoked right after the source request has been
-	// translated to the OpenAI upstream format and before thinking.ApplyThinking runs.
-	// It receives the translated OpenAI-format body and the full (possibly suffixed)
-	// model name, and may rewrite the body. Used by providers with format-specific
-	// post-translation quirks (e.g., NVIDIA NIM chat_template_kwargs).
+	// translated to the OpenAI upstream format. The hook is responsible for applying
+	// provider-specific thinking configuration; the generic thinking.ApplyThinking
+	// pass is skipped when a hook is present. It receives the translated OpenAI-format
+	// body and the full (possibly suffixed) model name, and may rewrite the body. Used
+	// by providers with format-specific post-translation quirks (e.g., NVIDIA NIM
+	// chat_template_kwargs).
 	translateHook func(body []byte, model string) []byte
 }
 
@@ -127,11 +129,15 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *shinwayauth.Au
 	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, opts.Stream)
 	if e.translateHook != nil {
 		translated = e.translateHook(translated, req.Model)
-	}
-
-	translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
-	if err != nil {
-		return resp, err
+		// The hook owns thinking configuration for this provider (e.g. NVIDIA
+		// injects chat_template_kwargs via the NVIDIA applier). Skip the generic
+		// pass below, which would otherwise select the OpenAI applier (toFormat is
+		// "openai" here) and re-apply — a double invocation with the wrong applier.
+	} else {
+		translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
+		if err != nil {
+			return resp, err
+		}
 	}
 
 	requestedModel := helps.PayloadRequestedModel(opts, req.Model)
@@ -331,11 +337,13 @@ func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *shinwaya
 	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, true)
 	if e.translateHook != nil {
 		translated = e.translateHook(translated, req.Model)
-	}
-
-	translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
-	if err != nil {
-		return nil, err
+		// The hook owns thinking configuration for this provider; running the
+		// generic pass again here would double-apply with the OpenAI applier.
+	} else {
+		translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	requestedModel := helps.PayloadRequestedModel(opts, req.Model)
