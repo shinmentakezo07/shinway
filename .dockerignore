@@ -20,6 +20,17 @@ auths
 logs
 conv
 config.yaml
+db/*.db
+db/*.db-shm
+db/*.db-wal
+db/*.jsonl
+!db/.gitkeep
+
+# Web build artifacts
+web/dist
+web/node_modules
+web/package-lock.json
+web/bun.lock
 
 # Development/editor
 bin

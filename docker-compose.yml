@@ -14,6 +14,7 @@ services:
     #   - .env
     environment:
       DEPLOY: ${DEPLOY:-}
+      MANAGEMENT_LOCAL_WEB_PATH: /shinway/web
     ports:
       - "8317:8317"
       - "8085:8085"
@@ -26,4 +27,7 @@ services:
       - ${CLI_PROXY_AUTH_PATH:-./auths}:/root/.cli-proxy-api
       - ${CLI_PROXY_LOG_PATH:-./logs}:/shinway/logs
       - ${CLI_PROXY_PLUGIN_PATH:-./plugins}:/shinway/plugins
+      - ${CLI_PROXY_DB_PATH:-./db}:/shinway/db
+      # Optional: persist locally-built management panel to avoid rebuilds on each start
+      # - ${CLI_PROXY_WEB_DIST_PATH:-./web/dist}:/shinway/web/dist
     restart: unless-stopped

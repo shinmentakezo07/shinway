@@ -12,12 +12,14 @@ services:
     container_name: cli-proxy-api-cluster
     environment:
       HOME_JWT: ${HOME_JWT:-}
+      MANAGEMENT_LOCAL_WEB_PATH: /shinway/web
     ports:
       - "8317:8317"
     volumes:
       - ${CLI_PROXY_HOME_PATH:-./home}:/root/.cli-proxy-api
       - ${CLI_PROXY_LOG_PATH:-./logs}:/shinway/logs
       - ${CLI_PROXY_PLUGIN_PATH:-./plugins}:/shinway/plugins
+      - ${CLI_PROXY_DB_PATH:-./db}:/shinway/db
     command: >
       sh -eu -c '
         if [ -z "$$HOME_JWT" ]; then
