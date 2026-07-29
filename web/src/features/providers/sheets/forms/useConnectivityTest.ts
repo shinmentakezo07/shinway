@@ -179,7 +179,7 @@ export function useConnectivityTest(
 
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
-      if (brand !== 'openaiCompatibility') return false;
+      if (brand !== 'openaiCompatibility' && brand !== 'nvidiaNim') return false;
 
       const trimmedBase = baseUrl.trim();
       if (!trimmedBase) {
@@ -276,14 +276,14 @@ export function useConnectivityTest(
   );
 
   const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility') return;
+    if (brand !== 'openaiCompatibility' && brand !== 'nvidiaNim') return;
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));
   }, [apiKeyEntries, brand, runOpenAIKey]);
 
   const runCodex = useCallback(async (): Promise<void> => {
-    if (brand !== 'codex' && brand !== 'xai') return;
+    if (brand !== 'codex' && brand !== 'xai' && brand !== 'nvidiaNim') return;
 
     const trimmedBase = baseUrl.trim();
     if (!trimmedBase) {
@@ -291,7 +291,11 @@ export function useConnectivityTest(
       return;
     }
 
-    const endpoint = buildCodexResponsesEndpoint(trimmedBase);
+    // NVIDIA NIM exposes OpenAI chat-completions, Codex/xAI use the Responses API.
+    const endpoint =
+      brand === 'nvidiaNim'
+        ? buildOpenAIChatCompletionsEndpoint(trimmedBase)
+        : buildCodexResponsesEndpoint(trimmedBase);
     if (!endpoint) {
       setCodexStatus({ state: 'error', message: messages.endpointInvalid });
       return;
@@ -304,11 +308,24 @@ export function useConnectivityTest(
     }
 
     const customHeaders = buildHeaderObject(formHeaders);
-    const explicitKey = (apiKey ?? '').trim();
-    const persistedKey = (fallbackApiKey ?? '').trim();
+    let explicitKey = (apiKey ?? '').trim();
+    let persistedKey = (fallbackApiKey ?? '').trim();
+    let entryAuthIndex = '';
+    if (brand === 'nvidiaNim') {
+      const firstEntry = (apiKeyEntries ?? []).find(
+        (entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim()
+      );
+      const entryKey =
+        (firstEntry?.apiKey ?? '').trim() || (firstEntry?.existingApiKey ?? '').trim();
+      if (entryKey) {
+        explicitKey = entryKey;
+        persistedKey = '';
+      }
+      entryAuthIndex = (firstEntry?.authIndex ?? '').trim();
+    }
     const hasAuthorization = hasHeader(customHeaders, 'authorization');
     const resolvedKey = explicitKey || persistedKey;
-    const resolvedAuthIndex = (authIndex ?? '').trim() || undefined;
+    const resolvedAuthIndex = ((authIndex ?? '').trim() || entryAuthIndex) || undefined;
 
     if (!resolvedKey && !hasAuthorization && !resolvedAuthIndex) {
       setCodexStatus({ state: 'error', message: messages.apiKeyRequired });
@@ -327,6 +344,20 @@ export function useConnectivityTest(
       }
     }
 
+    const payload =
+      brand === 'nvidiaNim'
+        ? JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: 'Hi' }],
+            stream: false,
+            max_tokens: 8,
+          })
+        : JSON.stringify({
+            model,
+            input: 'Hi',
+            stream: false,
+          });
+
     setCodexStatus({ state: 'loading', message: '' });
     setInFlight((n) => n + 1);
     try {
@@ -336,11 +367,7 @@ export function useConnectivityTest(
           method: 'POST',
           url: endpoint,
           header: headerObj,
-          data: JSON.stringify({
-            model,
-            input: 'Hi',
-            stream: false,
-          }),
+          data: payload,
         },
         { timeout: DEFAULT_TIMEOUT_MS }
       );
@@ -356,7 +383,18 @@ export function useConnectivityTest(
     } finally {
       setInFlight((n) => n - 1);
     }
-  }, [apiKey, authIndex, baseUrl, brand, fallbackApiKey, formHeaders, messages, models, testModel]);
+  }, [
+    apiKey,
+    apiKeyEntries,
+    authIndex,
+    baseUrl,
+    brand,
+    fallbackApiKey,
+    formHeaders,
+    messages,
+    models,
+    testModel,
+  ]);
 
   const runGemini = useCallback(async (): Promise<void> => {
     if (brand !== 'gemini') return;

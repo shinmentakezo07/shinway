@@ -48,6 +48,8 @@ func StripThinkingConfig(body []byte, provider string) []byte {
 		}
 	case "openai":
 		paths = []string{"reasoning_effort"}
+	case "nvidia":
+		paths = []string{"reasoning_effort", "chat_template_kwargs"}
 	case "kimi":
 		paths = []string{
 			"reasoning_effort",

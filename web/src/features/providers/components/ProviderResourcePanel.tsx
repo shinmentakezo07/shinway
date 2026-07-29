@@ -5,6 +5,7 @@ import { PROVIDER_LOGOS } from '../brandLogos';
 import { CLAUDE_API_AFFILIATE_URL } from '../claudeApi';
 import { getKimiAffiliateUrl } from '../kimi';
 import { APIKEY_FUN_AFFILIATE_URL, APIKEY_FUN_DASHBOARD_URL } from '../sponsor';
+import { NVIDIA_NIM_AFFILIATE_URL } from '../nvidiaNim';
 import { getSponsorProviderDefinition } from '../sponsorDefinitions';
 import type { ProviderGroup, ProviderResource } from '../types';
 import { ProviderResourceTable } from './ProviderResourceTable';
@@ -67,6 +68,8 @@ export function ProviderResourcePanel({
         ? getKimiAffiliateUrl(i18n.resolvedLanguage ?? i18n.language)
       : group.id === 'code0' || group.id === 'fennoAI' || group.id === 'qiniuCloud'
         ? getSponsorProviderDefinition(group.id).affiliateUrl
+      : group.id === 'nvidiaNim'
+        ? NVIDIA_NIM_AFFILIATE_URL
         : null;
   const registrationLabel = t(
     group.id === 'kimi' ? 'providersPage.sponsor.registerNow' : 'providersPage.sponsor.registerLink'
@@ -74,6 +77,10 @@ export function ProviderResourcePanel({
   const emptyText = showSponsorRegistrationLink
     ? t('providersPage.sponsor.emptyRegisterHint')
     : t('providersPage.table.empty');
+  // List brands (NVIDIA NIM, Gemini, xAI, etc.) can hold multiple keys; keep the
+  // "+ New" action visible in the header even when resources already exist so
+  // users can add another key without emptying the list first.
+  const canAddInHeader = !showSponsorRegistrationLink && !showSponsorDashboardLink;
   const logoClassName = [
     styles.logo,
     logo?.themeSurface ? styles.logoThemeSurface : '',
@@ -151,17 +158,32 @@ export function ProviderResourcePanel({
               </a>
             ) : null}
           </div>
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon} aria-hidden="true">
-              <IconSearch size={16} />
-            </span>
-            <input
-              type="search"
-              className={styles.searchInput}
-              value={filter}
-              onChange={(event) => onFilterChange(event.target.value)}
-              placeholder={t('providersPage.table.filterPlaceholder')}
-            />
+          <div className={styles.headerActions}>
+            <div className={styles.searchWrap}>
+              <span className={styles.searchIcon} aria-hidden="true">
+                <IconSearch size={16} />
+              </span>
+              <input
+                type="search"
+                className={styles.searchInput}
+                value={filter}
+                onChange={(event) => onFilterChange(event.target.value)}
+                placeholder={t('providersPage.table.filterPlaceholder')}
+              />
+            </div>
+            {canAddInHeader ? (
+              <button
+                type="button"
+                className={styles.headerAddButton}
+                onClick={onCreate}
+                disabled={disableMutations}
+                aria-label={t('providersPage.actions.new')}
+                title={t('providersPage.actions.new')}
+              >
+                <IconPlus size={16} />
+                <span className={styles.headerAddLabel}>{t('providersPage.actions.new')}</span>
+              </button>
+            ) : null}
           </div>
         </div>
         {toolbarControls ? (

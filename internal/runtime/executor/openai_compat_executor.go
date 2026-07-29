@@ -39,11 +39,23 @@ const (
 type OpenAICompatExecutor struct {
 	provider string
 	cfg      *config.Config
+	// translateHook, when non-nil, is invoked right after the source request has been
+	// translated to the OpenAI upstream format and before thinking.ApplyThinking runs.
+	// It receives the translated OpenAI-format body and the full (possibly suffixed)
+	// model name, and may rewrite the body. Used by providers with format-specific
+	// post-translation quirks (e.g., NVIDIA NIM chat_template_kwargs).
+	translateHook func(body []byte, model string) []byte
 }
 
 // NewOpenAICompatExecutor creates an executor bound to a provider key (e.g., "openrouter").
 func NewOpenAICompatExecutor(provider string, cfg *config.Config) *OpenAICompatExecutor {
 	return &OpenAICompatExecutor{provider: provider, cfg: cfg}
+}
+
+// NewOpenAICompatExecutorWithHook creates an executor with an optional post-translation
+// hook applied to the OpenAI-format payload. A nil hook delegates to the plain executor.
+func NewOpenAICompatExecutorWithHook(provider string, cfg *config.Config, hook func([]byte, string) []byte) *OpenAICompatExecutor {
+	return &OpenAICompatExecutor{provider: provider, cfg: cfg, translateHook: hook}
 }
 
 // Identifier implements shinwayauth.ProviderExecutor.
@@ -113,6 +125,9 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *shinwayauth.Au
 	originalPayload := originalPayloadSource
 	originalTranslated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, opts.Stream)
 	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, opts.Stream)
+	if e.translateHook != nil {
+		translated = e.translateHook(translated, req.Model)
+	}
 
 	translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
 	if err != nil {
@@ -314,6 +329,9 @@ func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *shinwaya
 	originalPayload := originalPayloadSource
 	originalTranslated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, true)
 	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, true)
+	if e.translateHook != nil {
+		translated = e.translateHook(translated, req.Model)
+	}
 
 	translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
 	if err != nil {

@@ -33,6 +33,7 @@ const PROVIDER_COMMON_KEY_FIELDS = [
 const GEMINI_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 const CODEX_KEY_FIELDS = [...PROVIDER_COMMON_KEY_FIELDS, 'websockets'] as const;
 const XAI_KEY_FIELDS = CODEX_KEY_FIELDS;
+const NVIDIA_KEY_FIELDS = CODEX_KEY_FIELDS;
 const CLAUDE_KEY_FIELDS = [
   ...PROVIDER_COMMON_KEY_FIELDS,
   'cloak',
@@ -480,6 +481,26 @@ export const providersApi = {
 
   deleteXAIConfig: (apiKey: string, baseUrl?: string) =>
     apiClient.delete(`/xai-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
+
+  createNVIDIAConfig: (config: ProviderKeyConfig) =>
+    mutateLatestProviderList('nvidia-api-key', (latestItems) =>
+      appendLatestProviderRecord(latestItems, serializeProviderKey(config), (raw, payload) =>
+        mergeProviderKeyPayload(raw, payload, NVIDIA_KEY_FIELDS)
+      )
+    ),
+
+  updateNVIDIAConfig: (apiKey: string, baseUrl: string | undefined, config: ProviderKeyConfig) =>
+    mutateLatestProviderList('nvidia-api-key', (latestItems) =>
+      replaceLatestProviderRecord(
+        latestItems,
+        (record) => matchesProviderKey(record, apiKey, baseUrl),
+        serializeProviderKey(config),
+        (raw, payload) => mergeProviderKeyPayload(raw, payload, NVIDIA_KEY_FIELDS)
+      )
+    ),
+
+  deleteNVIDIAConfig: (apiKey: string, baseUrl?: string) =>
+    apiClient.delete(`/nvidia-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
 
   createClaudeConfig: (config: ProviderKeyConfig) =>
     mutateLatestProviderList('claude-api-key', (latestItems) =>

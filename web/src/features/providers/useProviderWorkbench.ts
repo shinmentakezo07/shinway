@@ -7,7 +7,13 @@ import {
   withDisableAllModelsRule,
   withoutDisableAllModelsRule,
 } from '@/components/providers/utils';
-import type { GeminiKeyConfig, ModelAlias, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
+import type {
+  ApiKeyEntry,
+  GeminiKeyConfig,
+  ModelAlias,
+  OpenAIProviderConfig,
+  ProviderKeyConfig,
+} from '@/types';
 import {
   apiKeyFunToResource,
   claudeApiToResource,
@@ -16,6 +22,8 @@ import {
   codexToResource,
   fennoAIToResource,
   geminiToResource,
+  groupNvidiaEntries,
+  nvidiaToResource,
   openaiToResource,
   qiniuCloudToResource,
   kimiToResource,
@@ -145,7 +153,7 @@ const buildModelAliases = (
     .filter((m) => m.name);
 
 const buildProviderKeyConfig = (
-  brand: 'gemini' | 'codex' | 'xai' | 'claude' | 'vertex',
+  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'claude' | 'vertex',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | GeminiKeyConfig | null
 ): ProviderKeyConfig | GeminiKeyConfig => {
@@ -353,6 +361,32 @@ const toggleSponsorConfig = async (raw: SponsorProviderRaw, disabled: boolean) =
   }
 };
 
+const buildNvidiaConfig = (
+  input: ProviderEntryFormInput,
+  existing?: ProviderKeyConfig | null
+): ProviderKeyConfig => {
+  const raw = buildProviderKeyConfig('nvidiaNim', input, existing ?? undefined) as ProviderKeyConfig;
+  const existingEntries = existing?.apiKeyEntries ?? [];
+  const apiKeyEntries: ApiKeyEntry[] = [];
+  (input.apiKeyEntries ?? []).forEach((entry, index) => {
+    const fallback =
+      entry.existingApiKey?.trim() || existingEntries[index]?.apiKey?.trim() || '';
+    const apiKey = entry.apiKey.trim() || fallback;
+    if (!apiKey) return;
+    apiKeyEntries.push({
+      apiKey,
+      proxyUrl: entry.proxyUrl.trim() || undefined,
+      authIndex: entry.authIndex?.trim() || undefined,
+    });
+  });
+
+  return {
+    ...raw,
+    apiKey: '',
+    apiKeyEntries,
+  };
+};
+
 /* -------------------------------------------------------------------------- */
 /* hook                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -445,6 +479,23 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           break;
         case 'xai':
           resources = (config.xaiApiKeys ?? []).map((item, index) => xaiToResource(item, index));
+          break;
+        case 'nvidiaNim':
+          resources = groupNvidiaEntries(config).map((group, groupIndex) => {
+            const primaryIndex = group.indices[0] ?? groupIndex;
+            const resource = nvidiaToResource(group.raw, primaryIndex);
+            const firstEntry = group.raw.apiKeyEntries?.[0];
+            return {
+              ...resource,
+              selector: {
+                brand: 'nvidiaNim',
+                apiKey: firstEntry?.apiKey ?? '',
+                baseUrl: group.raw.baseUrl,
+                index: primaryIndex,
+                indices: group.indices,
+              },
+            };
+          });
           break;
         case 'claude':
           resources = (config.claudeApiKeys ?? []).reduce<ProviderResource[]>(
@@ -658,6 +709,18 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           await providersApi.createXAIConfig(
             buildProviderKeyConfig('xai', input) as ProviderKeyConfig
           );
+        } else if (brand === 'nvidiaNim') {
+          const built = buildNvidiaConfig(input);
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const entry = built.apiKeyEntries?.[i];
+            await providersApi.createNVIDIAConfig({
+              ...built,
+              apiKey: entry?.apiKey ?? built.apiKey ?? '',
+              proxyUrl: entry?.proxyUrl ?? built.proxyUrl,
+              apiKeyEntries: undefined,
+            });
+          }
         } else if (brand === 'claude') {
           await providersApi.createClaudeConfig(
             buildProviderKeyConfig('claude', input) as ProviderKeyConfig
@@ -714,6 +777,31 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             selector.baseUrl,
             buildProviderKeyConfig('xai', input, existing) as ProviderKeyConfig
           );
+        } else if (brand === 'nvidiaNim' && selector.brand === 'nvidiaNim') {
+          const existing = resource.raw as ProviderKeyConfig;
+          const built = buildNvidiaConfig(input, existing);
+          const oldIndices = selector.indices ?? [selector.index];
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, oldIndices.length, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const oldIndex = oldIndices[i];
+            const oldConfig = config?.nvidiaApiKeys?.[oldIndex];
+            const entry = built.apiKeyEntries?.[i];
+            if (oldConfig && entry) {
+              await providersApi.updateNVIDIAConfig(oldConfig.apiKey, oldConfig.baseUrl, {
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            } else if (oldConfig && !entry) {
+              await providersApi.deleteNVIDIAConfig(oldConfig.apiKey, oldConfig.baseUrl);
+            } else if (entry) {
+              await providersApi.createNVIDIAConfig({
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            }
+          }
         } else if (brand === 'claude' && selector.brand === 'claude') {
           const existing = resource.raw as ProviderKeyConfig;
           await providersApi.updateClaudeConfig(
@@ -754,7 +842,7 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
         setMutating(false);
       }
     },
-    [persistSponsorConfig, refetch]
+    [config, persistSponsorConfig, refetch]
   );
 
   const deleteProvider = useCallback(
@@ -774,6 +862,16 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           await providersApi.deleteXAIConfig(sel.apiKey, sel.baseUrl);
           const next = (config?.xaiApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('xai-api-key', next);
+        } else if (sel.brand === 'nvidiaNim') {
+          const indices = sel.indices ?? [sel.index];
+          const configs = indices
+            .map((i) => config?.nvidiaApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            await providersApi.deleteNVIDIAConfig(cfg.apiKey, cfg.baseUrl);
+          }
+          const next = (config?.nvidiaApiKeys ?? []).filter((_, i) => !indices.includes(i));
+          updateConfigValue('nvidia-api-key', next);
         } else if (sel.brand === 'claude') {
           await providersApi.deleteClaudeConfig(sel.apiKey, sel.baseUrl);
           const next = (config?.claudeApiKeys ?? []).filter((_, i) => i !== sel.index);
@@ -862,6 +960,20 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           } else if (selector.brand === 'vertex') {
             await providersApi.updateVertexConfig(selector.apiKey, selector.baseUrl, next);
           }
+        } else if (brand === 'nvidiaNim' && selector.brand === 'nvidiaNim') {
+          const excluded = disabled
+            ? withDisableAllModelsRule()
+            : withoutDisableAllModelsRule();
+          const indices = selector.indices ?? [selector.index];
+          const configs = indices
+            .map((i) => config?.nvidiaApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            await providersApi.updateNVIDIAConfig(cfg.apiKey, cfg.baseUrl, {
+              ...cfg,
+              excludedModels: excluded,
+            });
+          }
         } else if (brand === 'openaiCompatibility' && selector.brand === 'openaiCompatibility') {
           await providersApi.updateOpenAIProviderDisabled(selector.index, disabled);
         } else if (
@@ -881,7 +993,7 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
         setMutating(false);
       }
     },
-    [refetch]
+    [config, refetch]
   );
 
   return {

@@ -291,6 +291,15 @@ func (s *Service) registerExecutorForAuth(a *coreauth.Auth, forceReplace bool) {
 			}
 		}
 		s.coreManager.RegisterExecutor(executor.NewXAIAutoExecutor(cfg))
+	case "nvidia":
+		if !forceReplace {
+			if existingExecutor, hasExecutor := s.coreManager.Executor("nvidia"); hasExecutor {
+				if _, isNVIDIAExecutor := existingExecutor.(*executor.NVIDIAExecutor); isNVIDIAExecutor {
+					return
+				}
+			}
+		}
+		s.coreManager.RegisterExecutor(executor.NewNVIDIAExecutor(cfg))
 	default:
 		providerKey := strings.ToLower(strings.TrimSpace(a.Provider))
 		if providerKey == "" {

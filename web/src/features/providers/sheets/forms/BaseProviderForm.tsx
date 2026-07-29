@@ -29,6 +29,7 @@ import { ApiKeyEntriesEditor } from './ApiKeyEntriesEditor';
 import { ModelEntriesEditor } from './ModelEntriesEditor';
 import styles from './sharedForm.module.scss';
 import { CLAUDE_API_BASE_URL } from '../../claudeApi';
+import { NVIDIA_NIM_DEFAULT_BASE_URL } from '../../nvidiaNim';
 
 interface BaseProviderFormProps {
   brand: ProviderBrand;
@@ -69,7 +70,13 @@ function buildInitialForm(
       apiKey: '',
       name: '',
       baseUrl:
-        brand === 'claudeApi' ? CLAUDE_API_BASE_URL : brand === 'xai' ? XAI_API_BASE_URL : '',
+        brand === 'claudeApi'
+          ? CLAUDE_API_BASE_URL
+          : brand === 'xai'
+            ? XAI_API_BASE_URL
+            : brand === 'nvidiaNim'
+              ? NVIDIA_NIM_DEFAULT_BASE_URL
+              : '',
       proxyUrl: '',
       prefix: '',
       disabled: false,
@@ -87,11 +94,13 @@ function buildInitialForm(
         brand === 'openaiCompatibility' ||
         brand === 'codex' ||
         brand === 'xai' ||
+        brand === 'nvidiaNim' ||
         isClaudeLikeBrand(brand) ||
         brand === 'gemini'
           ? ''
           : undefined,
-      apiKeyEntries: brand === 'openaiCompatibility' ? [emptyApiKeyEntry()] : undefined,
+      apiKeyEntries:
+        brand === 'openaiCompatibility' || brand === 'nvidiaNim' ? [emptyApiKeyEntry()] : undefined,
     };
   }
 
@@ -130,6 +139,53 @@ function buildInitialForm(
             authIndex: entry.authIndex,
           }))
         : [emptyApiKeyEntry()],
+    };
+  }
+
+  if (brand === 'nvidiaNim') {
+    const cfg = raw as ProviderKeyConfig;
+    const disabled = hasDisableAllModelsRule(cfg.excludedModels);
+    const excludedList = stripDisableAllRule(cfg.excludedModels);
+    return {
+      apiKey: '',
+      name: '',
+      baseUrl: cfg.baseUrl ?? '',
+      proxyUrl: cfg.proxyUrl ?? '',
+      prefix: cfg.prefix ?? '',
+      disabled,
+      disableCooling: cfg.disableCooling === true,
+      priority: cfg.priority,
+      models: cfg.models?.length
+        ? cfg.models.map((m) => ({
+            name: m.name,
+            alias: m.alias ?? '',
+            priority: m.priority,
+            testModel: m.testModel,
+          }))
+        : [emptyModel()],
+      headers: cfg.headers
+        ? Object.entries(cfg.headers).map(([k, v]) => ({ key: k, value: String(v) }))
+        : [emptyHeader()],
+      excludedModelsText: excludedList.join('\n'),
+      websockets: undefined,
+      cloak: undefined,
+      experimentalCchSigning: undefined,
+      testModel: '',
+      apiKeyEntries: cfg.apiKeyEntries?.length
+        ? cfg.apiKeyEntries.map((entry) => ({
+            apiKey: '',
+            existingApiKey: entry.apiKey,
+            proxyUrl: entry.proxyUrl ?? '',
+            authIndex: entry.authIndex,
+          }))
+        : [
+            {
+              apiKey: '',
+              existingApiKey: cfg.apiKey ?? '',
+              proxyUrl: cfg.proxyUrl ?? '',
+              authIndex: cfg.authIndex,
+            },
+          ],
     };
   }
 
@@ -177,7 +233,10 @@ function buildInitialForm(
       ? (cfg as ProviderKeyConfig).experimentalCchSigning === true
       : undefined,
     testModel:
-      brand === 'codex' || brand === 'xai' || isClaudeLikeBrand(brand) || brand === 'gemini'
+      brand === 'codex' ||
+      brand === 'xai' ||
+      isClaudeLikeBrand(brand) ||
+      brand === 'gemini'
         ? ''
         : undefined,
   };
@@ -413,11 +472,12 @@ export function BaseProviderForm({
     brand === 'gemini' ||
     brand === 'codex' ||
     brand === 'xai' ||
+    brand === 'nvidiaNim' ||
     isClaudeLikeBrand(brand) ||
     brand === 'openaiCompatibility';
   const supportsOpenAIModelOptions = brand === 'openaiCompatibility';
   const singleConnectivity =
-    brand === 'codex' || brand === 'xai'
+    brand === 'codex' || brand === 'xai' || brand === 'nvidiaNim'
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
       : brand === 'gemini'
         ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
@@ -584,6 +644,7 @@ export function BaseProviderForm({
               {t('providersPage.form.testModel')}
               {brand === 'codex' ||
               brand === 'xai' ||
+              brand === 'nvidiaNim' ||
               isClaudeLikeBrand(brand) ||
               brand === 'gemini' ? (
                 <span className={styles.labelHint}>

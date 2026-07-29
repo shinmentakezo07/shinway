@@ -9,6 +9,7 @@ export const MODEL_DISCOVERY_BRANDS: ReadonlyArray<ProviderBrand> = [
   'gemini',
   'codex',
   'xai',
+  'nvidiaNim',
   'claude',
   'claudeApi',
   'openaiCompatibility',
@@ -62,13 +63,28 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           baseHeaders,
           resolvedAuthIndex
         );
-      } else if (brand === 'codex' || brand === 'xai') {
-        const key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
+      } else if (brand === 'codex' || brand === 'xai' || brand === 'nvidiaNim') {
+        let key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
+        let entryAuthIndex = resolvedAuthIndex;
+        if (brand === 'nvidiaNim') {
+          const firstEntry = (apiKeyEntries ?? []).find(
+            (entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim()
+          );
+          const entryKey =
+            (firstEntry?.apiKey ?? '').trim() || (firstEntry?.existingApiKey ?? '').trim();
+          if (entryKey) {
+            key = entryKey;
+          }
+          const entryAuthIdx = (firstEntry?.authIndex ?? '').trim();
+          if (entryAuthIdx) {
+            entryAuthIndex = entryAuthIdx;
+          }
+        }
         next = await modelsApi.fetchV1ModelsViaApiCall(
           baseUrl,
           key,
           baseHeaders,
-          resolvedAuthIndex
+          entryAuthIndex
         );
       } else if (brand === 'claude' || brand === 'claudeApi') {
         const key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();

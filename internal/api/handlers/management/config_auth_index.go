@@ -28,6 +28,11 @@ type xaiKeyWithAuthIndex struct {
 	AuthIndex string `json:"auth-index,omitempty"`
 }
 
+type nvidiaKeyWithAuthIndex struct {
+	config.NVIDIAKey
+	AuthIndex string `json:"auth-index,omitempty"`
+}
+
 type vertexCompatKeyWithAuthIndex struct {
 	config.VertexCompatKey
 	AuthIndex string `json:"auth-index,omitempty"`
@@ -222,6 +227,35 @@ func (h *Handler) xaiKeysWithAuthIndex() []xaiKeyWithAuthIndex {
 		}
 		out[i] = xaiKeyWithAuthIndex{
 			XAIKey:    entry,
+			AuthIndex: authIndex,
+		}
+	}
+	return out
+}
+
+func (h *Handler) nvidiaKeysWithAuthIndex() []nvidiaKeyWithAuthIndex {
+	if h == nil {
+		return nil
+	}
+	liveIndexByID := h.liveAuthIndexByID()
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.cfg == nil {
+		return nil
+	}
+
+	idGen := synthesizer.NewStableIDGenerator()
+	out := make([]nvidiaKeyWithAuthIndex, len(h.cfg.NVIDIAKey))
+	for i := range h.cfg.NVIDIAKey {
+		entry := h.cfg.NVIDIAKey[i]
+		authIndex := ""
+		if key := strings.TrimSpace(entry.APIKey); key != "" {
+			id, _ := idGen.Next("nvidia:apikey", key, entry.BaseURL)
+			authIndex = liveIndexByID[id]
+		}
+		out[i] = nvidiaKeyWithAuthIndex{
+			NVIDIAKey: entry,
 			AuthIndex: authIndex,
 		}
 	}

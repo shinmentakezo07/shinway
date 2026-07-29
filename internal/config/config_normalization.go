@@ -141,6 +141,25 @@ func (cfg *Config) SanitizeXAIKeys() {
 	cfg.XAIKey = sanitizeCodexKeyEntries(cfg.XAIKey)
 }
 
+// NVIDIAProviderBaseURL is the canonical OpenAI-compatible base URL for hosted NVIDIA NIM.
+const NVIDIAProviderBaseURL = "https://integrate.api.nvidia.com/v1"
+
+// SanitizeNVIDIAKeys normalizes NVIDIA NIM API key entries.
+// Empty BaseURL is defaulted to the hosted NIM endpoint so users can leave it blank
+// in the Quick Fill UI.
+func (cfg *Config) SanitizeNVIDIAKeys() {
+	if cfg == nil {
+		return
+	}
+	for i := range cfg.NVIDIAKey {
+		cfg.NVIDIAKey[i].BaseURL = strings.TrimSpace(cfg.NVIDIAKey[i].BaseURL)
+		if cfg.NVIDIAKey[i].BaseURL == "" {
+			cfg.NVIDIAKey[i].BaseURL = NVIDIAProviderBaseURL
+		}
+	}
+	cfg.NVIDIAKey = sanitizeCodexKeyEntries(cfg.NVIDIAKey)
+}
+
 func sanitizeCodexKeyEntries(entries []CodexKey) []CodexKey {
 	if len(entries) == 0 {
 		return entries

@@ -52,6 +52,13 @@ export interface ProviderKeyConfig {
   cloak?: CloakConfig;
   experimentalCchSigning?: boolean;
   authIndex?: string;
+  /**
+   * UI-only grouping of multiple keys under one provider entry (e.g. NVIDIA NIM
+   * when the panel aggregates several API keys into a single resource). The
+   * backend nvidia-api-key schema still stores one key per list item; the
+   * workbench fans this out into N list entries when persisting.
+   */
+  apiKeyEntries?: ApiKeyEntry[];
 }
 
 export interface OpenAIProviderConfig {

@@ -357,6 +357,13 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
       .filter(Boolean) as ProviderKeyConfig[];
   }
 
+  const nvidiaList = raw['nvidia-api-key'];
+  if (Array.isArray(nvidiaList)) {
+    config.nvidiaApiKeys = nvidiaList
+      .map((item) => normalizeProviderKeyConfig(item))
+      .filter(Boolean) as ProviderKeyConfig[];
+  }
+
   const claudeList = raw['claude-api-key'];
   if (Array.isArray(claudeList)) {
     config.claudeApiKeys = claudeList

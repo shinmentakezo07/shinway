@@ -455,6 +455,28 @@ type XAIKey = CodexKey
 // XAIModel uses the Codex model mapping structure for xAI models.
 type XAIModel = CodexModel
 
+// NVIDIAKey uses the Codex API key structure for native NVIDIA NIM execution.
+type NVIDIAKey = CodexKey
+
+// NVIDIAModel uses the Codex model mapping structure for NVIDIA NIM models.
+type NVIDIAModel = CodexModel
+
+// NVIDIAConfig configures provider-wide NVIDIA NIM request behavior.
+type NVIDIAConfig struct {
+	// DefaultThinking controls whether requests without an explicit thinking suffix or
+	// body thinking field are issued with chat_template_kwargs={thinking:true} for models
+	// whose reasoning capability is unknown. Defaults to true.
+	DefaultThinking *bool `yaml:"default-thinking,omitempty" json:"default-thinking,omitempty"`
+}
+
+// DefaultThinkingEnabled returns the effective default-thinking flag (true when unset).
+func (c NVIDIAConfig) DefaultThinkingEnabled() bool {
+	if c.DefaultThinking == nil {
+		return true
+	}
+	return *c.DefaultThinking
+}
+
 // GeminiKey represents the configuration for a Gemini API key,
 // including optional overrides for upstream base URL, proxy routing, and headers.
 type GeminiKey struct {

@@ -1,4 +1,4 @@
-import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
+import type { Config, GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
 import { hasDisableAllModelsRule, stripDisableAllModelsRule } from '@/components/providers/utils';
 import { maskApiKey } from '@/utils/format';
 import {
@@ -32,6 +32,7 @@ import {
   getKimiProtocolUrls,
   resolveKimiBaseUrl,
 } from './kimi';
+import { NVIDIA_NIM_DISPLAY_NAME } from './nvidiaNim';
 import type {
   ProviderBrand,
   ProviderResource,
@@ -66,7 +67,7 @@ const truncateForId = (value: string | undefined | null): string => {
 };
 
 function providerKeyToResource(
-  brand: 'gemini' | 'codex' | 'xai' | 'claude' | 'claudeApi' | 'vertex',
+  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'claude' | 'claudeApi' | 'vertex',
   config: GeminiKeyConfig | ProviderKeyConfig,
   index: number
 ): ProviderResource {
@@ -123,6 +124,78 @@ export function codexToResource(config: ProviderKeyConfig, index: number): Provi
 
 export function xaiToResource(config: ProviderKeyConfig, index: number): ProviderResource {
   return providerKeyToResource('xai', config, index);
+}
+
+export function nvidiaToResource(config: ProviderKeyConfig, index: number): ProviderResource {
+  const resource = providerKeyToResource('nvidiaNim', config, index);
+  const entries = config.apiKeyEntries?.length
+    ? config.apiKeyEntries
+    : [{ apiKey: config.apiKey ?? '', proxyUrl: config.proxyUrl }];
+  return {
+    ...resource,
+    name: resource.name ?? NVIDIA_NIM_DISPLAY_NAME,
+    apiKeyEntryCount: entries.length,
+    raw: { ...config, apiKeyEntries: entries },
+  };
+}
+
+export interface NvidiaNimGroup {
+  entries: ProviderKeyConfig[];
+  indices: number[];
+  raw: ProviderKeyConfig;
+}
+
+const nvidiaGroupKey = (item: ProviderKeyConfig) =>
+  JSON.stringify([
+    item.baseUrl ?? '',
+    item.prefix ?? '',
+    item.proxyUrl ?? '',
+    item.priority ?? null,
+    item.disableCooling === true,
+    item.headers ?? {},
+    item.models ?? [],
+    item.excludedModels ?? [],
+  ]);
+
+export function groupNvidiaEntries(config: Config | null | undefined): NvidiaNimGroup[] {
+  const list = config?.nvidiaApiKeys ?? [];
+  const byKey = new Map<string, NvidiaNimGroup>();
+
+  list.forEach((item, index) => {
+    const configKey = nvidiaGroupKey(item);
+    const entry: ProviderKeyConfig = {
+      apiKey: item.apiKey ?? '',
+      proxyUrl: item.proxyUrl?.trim() || undefined,
+      authIndex: item.authIndex,
+    };
+    const existing = byKey.get(configKey);
+    if (existing) {
+      existing.entries.push(entry);
+      existing.indices.push(index);
+      return;
+    }
+
+    const groupedRaw: ProviderKeyConfig = {
+      ...item,
+      apiKey: '',
+      apiKeyEntries: [
+        {
+          apiKey: item.apiKey ?? '',
+          proxyUrl: item.proxyUrl?.trim() || undefined,
+          authIndex: item.authIndex,
+        },
+      ],
+    };
+    byKey.set(configKey, { entries: [entry], indices: [index], raw: groupedRaw });
+  });
+
+  return Array.from(byKey.values()).map((group) => ({
+    ...group,
+    raw: {
+      ...group.raw,
+      apiKeyEntries: group.entries,
+    },
+  }));
 }
 
 export function claudeToResource(config: ProviderKeyConfig, index: number): ProviderResource {

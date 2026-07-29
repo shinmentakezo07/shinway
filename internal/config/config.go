@@ -112,6 +112,12 @@ type Config struct {
 	// XAIKey defines xAI API key configurations using the same structure as Codex API keys.
 	XAIKey []XAIKey `yaml:"xai-api-key" json:"xai-api-key"`
 
+	// NVIDIAKey defines NVIDIA NIM API key configurations using the same structure as Codex API keys.
+	NVIDIAKey []NVIDIAKey `yaml:"nvidia-api-key" json:"nvidia-api-key"`
+
+	// NVIDIA configures provider-wide NVIDIA NIM request behavior.
+	NVIDIA NVIDIAConfig `yaml:"nvidia" json:"nvidia"`
+
 	// XAI configures provider-wide xAI request behavior.
 	XAI XAIConfig `yaml:"xai" json:"xai"`
 

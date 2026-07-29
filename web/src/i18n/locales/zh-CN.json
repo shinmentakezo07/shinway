@@ -1403,7 +1403,8 @@
       "code0": "Code0",
       "fennoAI": "FennoAI",
       "qiniuCloud": "七牛云",
-      "kimi": "Kimi"
+      "kimi": "Kimi",
+      "nvidiaNim": "NVIDIA NIM"
     },
     "table": {
       "key": "密钥",
