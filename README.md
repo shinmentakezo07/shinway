@@ -32,6 +32,10 @@ You can access the following providers locally and with multiple CLI accounts th
         <td align="center"><a href="https://x.ai/grok"><img src="./assets/logo/xai.svg" alt="xAI" width="28" height="28" /></a></td>
         <td>xAI Grok series models (Grok 4.5, Grok Composer 2.5 Fast, etc.). Grok 4.5 is SpaceXAI's frontier model built for coding, agentic tasks, and knowledge work. It was trained in SpaceXAI's data centers in Memphis with new datasets spanning science, engineering, and math.</td>
     </tr>
+    <tr>
+        <td align="center"><a href="https://build.nvidia.com/"><img src="./web/src/assets/icons/nvidia.svg" alt="NVIDIA NIM" width="28" height="28" /></a></td>
+        <td>NVIDIA NIM hosted models (DeepSeek, MiniMax, Kimi, Inkling, and more). NVIDIA NIM speaks the OpenAI Chat Completions API but routes reasoning through a model-family-specific <code>chat_template_kwargs</code> payload rather than the standard <code>reasoning_effort</code> field. shinway maps its canonical thinking configuration onto per-model profiles and applies the necessary request rewrites (developer→system role remapping, text-content flattening, and <code>max_completion_tokens</code> → <code>max_tokens</code>). Get an API key from the <a href="https://build.nvidia.com/">NVIDIA build catalog</a>; the default base URL is <code>https://integrate.api.nvidia.com/v1</code>.</td>
+    </tr>
 </tbody>
 </table>
 
@@ -118,6 +122,7 @@ PackyCode provides special discounts for our software users: register using <a h
 - OpenAI Codex multi-account load balancing
 - Grok Build multi-account load balancing
 - OpenAI-compatible upstream providers via config (e.g., OpenRouter)
+- NVIDIA NIM hosted models via config (DeepSeek, MiniMax, Kimi, Inkling, and more) with per-model-family reasoning profile mapping
 - Reusable Go SDK for embedding the proxy (see `docs/sdk-usage.md`)
 
 ## Getting Started
