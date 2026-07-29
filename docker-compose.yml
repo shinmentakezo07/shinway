@@ -14,7 +14,6 @@ services:
     #   - .env
     environment:
       DEPLOY: ${DEPLOY:-}
-      MANAGEMENT_LOCAL_WEB_PATH: /shinway/web
     ports:
       - "8317:8317"
       - "8085:8085"

@@ -30,7 +30,6 @@ db/*.jsonl
 web/dist
 web/node_modules
 web/package-lock.json
-web/bun.lock
 
 # Development/editor
 bin
