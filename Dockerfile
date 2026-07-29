@@ -31,6 +31,7 @@ COPY --from=builder ./app/shinway /shinway/shinway
 COPY web /shinway/web
 
 COPY config.example.yaml /shinway/config.example.yaml
+COPY config.example.yaml /shinway/config.yaml
 
 WORKDIR /shinway
 
