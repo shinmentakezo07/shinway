@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/access"
@@ -90,13 +92,14 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	}
 
 	// Reopen the persistent usage store if the auth directory changed so the
-	// SQLite database stays colocated with credentials.
+	// default options are reapplied. The store itself is kept in the repo db/
+	// directory, but config reloads may switch mirror writers.
 	if oldCfg == nil || oldCfg.AuthDir != cfg.AuthDir {
-		resolvedAuthDir, errResolve := util.ResolveAuthDir(cfg.AuthDir)
-		if errResolve != nil {
-			log.WithError(errResolve).Warn("failed to resolve auth dir for usage store")
-		} else if _, errOpen := usagestore.Open(resolvedAuthDir); errOpen != nil {
-			log.WithError(errOpen).Warn("failed to reopen usage store after auth dir change")
+		wd, errWd := os.Getwd()
+		if errWd != nil {
+			log.WithError(errWd).Warn("failed to get working directory for usage store")
+		} else if _, errOpen := usagestore.Open(filepath.Join(wd, "db")); errOpen != nil {
+			log.WithError(errOpen).Warn("failed to reopen usage store on config reload")
 		}
 	}
 

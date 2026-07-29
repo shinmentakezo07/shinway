@@ -561,10 +561,46 @@ func main() {
 	coreauth.SetQuotaCooldownDisabled(cfg.DisableCooling)
 	coreauth.SetTransientErrorCooldownSeconds(cfg.TransientErrorCooldownSeconds)
 
+	if resolvedAuthDir, errResolveAuthDir := util.ResolveAuthDir(cfg.AuthDir); errResolveAuthDir != nil {
+		log.Errorf("failed to resolve auth directory: %v", errResolveAuthDir)
+		return
+	} else {
+		cfg.AuthDir = resolvedAuthDir
+	}
+
 	// The persistent usage store is independent of the redis queue toggle so
 	// the management dashboard always has data. Recording can be disabled at
-	// runtime via the management API.
-	if _, errUsageStore := usagestore.Open(cfg.AuthDir); errUsageStore != nil {
+	// runtime via the management API. Always mirror to a JSON Lines file and,
+	// when PostgreSQL is configured, mirror to the database as well.
+	usageDir := filepath.Join(wd, "db")
+	usageOpts := []usagestore.OpenOption{
+		func(s *usagestore.Store) {
+			if s == nil {
+				return
+			}
+			jsonPath := filepath.Join(s.Path(), "usage.jsonl")
+			if w, err := usagestore.NewJSONWriter(jsonPath); err == nil {
+				s.AttachWriter(w)
+			} else {
+				log.WithError(err).Warn("failed to initialize usage JSON mirror")
+			}
+		},
+	}
+	if usePostgresStore && pgStoreInst != nil {
+		usageOpts = append(usageOpts, func(s *usagestore.Store) {
+			if s == nil {
+				return
+			}
+			w, err := usagestore.NewPostgresWriter(pgStoreInst.DB(), pgStoreSchema)
+			if err == nil {
+				s.AttachWriter(w)
+			} else {
+				log.WithError(err).Warn("failed to initialize usage Postgres mirror")
+			}
+		})
+	}
+	usagestore.SetDefaultOptions(usageOpts...)
+	if _, errUsageStore := usagestore.Open(usageDir); errUsageStore != nil {
 		log.WithError(errUsageStore).Warn("failed to initialize usage store, analytics disabled")
 	}
 
@@ -577,13 +613,6 @@ func main() {
 
 	// Set the log level based on the configuration.
 	util.SetLogLevel(cfg)
-
-	if resolvedAuthDir, errResolveAuthDir := util.ResolveAuthDir(cfg.AuthDir); errResolveAuthDir != nil {
-		log.Errorf("failed to resolve auth directory: %v", errResolveAuthDir)
-		return
-	} else {
-		cfg.AuthDir = resolvedAuthDir
-	}
 	managementasset.SetCurrentConfig(cfg)
 
 	// Create login options to be used in authentication flows.

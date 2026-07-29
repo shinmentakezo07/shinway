@@ -33,6 +33,7 @@ var (
 
 	defaultStoreMu sync.RWMutex
 	defaultStore   *Store
+	defaultOpts    []OpenOption
 )
 
 func init() {
@@ -47,10 +48,45 @@ func SetEnabled(v bool) { enabled.Store(v) }
 // Enabled reports whether persistence is active.
 func Enabled() bool { return enabled.Load() }
 
+// OpenOption customizes the default store.
+type OpenOption func(*Store)
+
+// SetDefaultOptions registers options that will be applied to every future
+// Open call. It is intended to be called once at startup so the store can be
+// reopened (e.g. after a config reload) with the same mirror writers.
+func SetDefaultOptions(opts ...OpenOption) {
+	defaultStoreMu.Lock()
+	defer defaultStoreMu.Unlock()
+	defaultOpts = opts
+}
+
+// WithWriter attaches an extra Writer that receives a copy of every inserted
+// usage record. Writers are closed when the store is closed.
+func WithWriter(w Writer) OpenOption {
+	return func(s *Store) {
+		if s == nil || w == nil {
+			return
+		}
+		s.AttachWriter(w)
+	}
+}
+
+// AttachWriter adds a Writer to the store. It is safe for concurrent use.
+func (s *Store) AttachWriter(w Writer) {
+	if s == nil || w == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writers = append(s.writers, w)
+}
+
 // Open initializes (or reuses) the default store rooted at dir. The returned
 // store must be closed by the caller; however the package keeps a reference so
 // the usage plugin can reach it from any goroutine.
-func Open(dir string) (*Store, error) {
+// Options are remembered so a later Open call without options still uses the
+// same backends (JSON mirror, Postgres mirror, etc.).
+func Open(dir string, opts ...OpenOption) (*Store, error) {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
 		return nil, errors.New("usagestore: empty directory")
@@ -62,6 +98,10 @@ func Open(dir string) (*Store, error) {
 
 	defaultStoreMu.Lock()
 	defer defaultStoreMu.Unlock()
+
+	if len(opts) == 0 {
+		opts = defaultOpts
+	}
 
 	if defaultStore != nil {
 		if defaultStore.path == dbPath {
@@ -84,6 +124,12 @@ func Open(dir string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+
+	// Attach any configured extra writers (JSON mirror, Postgres mirror, ...).
+	for _, opt := range opts {
+		opt(store)
+	}
+
 	defaultStore = store
 	return store, nil
 }
@@ -107,23 +153,48 @@ func Close() error {
 	return err
 }
 
-// Store wraps a SQLite database with the schema required by the management
-// dashboard. Single-writer via MaxOpenConns(1) plus application-side mutex.
-type Store struct {
-	db   *sql.DB
-	path string
-	mu   sync.Mutex
+// Writer receives a copy of every persisted usage record. Writers are called
+// by the primary SQLite store after a successful insert so usage data can be
+// mirrored to JSON files, Postgres, or other backends.
+type Writer interface {
+	Write(ctx context.Context, r Record) error
+	Close() error
 }
 
-// Close closes the underlying database handle.
+// Store wraps a SQLite database with the schema required by the management
+// dashboard. Single-writer via MaxOpenConns(1) plus application-side mutex.
+// Additional Writer backends can be attached to mirror records.
+type Store struct {
+	db      *sql.DB
+	path    string
+	writers []Writer
+	mu      sync.Mutex
+}
+
+// Path returns the directory containing the SQLite database.
+func (s *Store) Path() string {
+	if s == nil {
+		return ""
+	}
+	return filepath.Dir(s.path)
+}
+
+// Close closes the underlying database handle and any attached mirror writers.
 func (s *Store) Close() error {
-	if s == nil || s.db == nil {
+	if s == nil {
 		return nil
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	err := s.db.Close()
-	s.db = nil
+	var err error
+	if s.db != nil {
+		err = s.db.Close()
+		s.db = nil
+	}
+	for _, w := range s.writers {
+		_ = w.Close()
+	}
+	s.writers = nil
 	return err
 }
 
@@ -258,7 +329,16 @@ func (s *Store) Insert(ctx context.Context, r Record) error {
 		r.InputTokens, r.OutputTokens, r.ReasoningTokens, r.CachedTokens,
 		r.CacheReadTokens, r.CacheCreationTokens, r.TotalTokens,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, w := range s.writers {
+		if wErr := w.Write(ctx, r); wErr != nil {
+			log.WithError(wErr).Debug("usagestore: mirror writer failed")
+		}
+	}
+	return nil
 }
 
 func truncate(s string, max int) string {

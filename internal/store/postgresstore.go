@@ -202,6 +202,15 @@ func (s *PostgresStore) WorkDir() string {
 	return s.spoolRoot
 }
 
+// DB exposes the underlying PostgreSQL connection so other components
+// (e.g. the usage store mirror) can share the same pool.
+func (s *PostgresStore) DB() *sql.DB {
+	if s == nil {
+		return nil
+	}
+	return s.db
+}
+
 // SetBaseDir implements the optional interface used by authenticators; it is a no-op because
 // the Postgres-backed store controls its own workspace.
 func (s *PostgresStore) SetBaseDir(string) {}

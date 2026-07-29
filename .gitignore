@@ -20,6 +20,13 @@ pgstore/*
 gitstore/*
 objectstore/*
 
+# Local database files
+db/*.db
+db/*.db-shm
+db/*.db-wal
+db/*.jsonl
+!db/.gitkeep
+
 # Static assets
 static/*
 
