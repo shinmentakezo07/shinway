@@ -34,6 +34,9 @@ const GEMINI_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 const CODEX_KEY_FIELDS = [...PROVIDER_COMMON_KEY_FIELDS, 'websockets'] as const;
 const XAI_KEY_FIELDS = CODEX_KEY_FIELDS;
 const NVIDIA_KEY_FIELDS = CODEX_KEY_FIELDS;
+// Zen is HTTP-only. Preserve a legacy/manual websockets field rather than
+// clearing it when an unrelated setting is saved from the management UI.
+const ZEN_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 const CLAUDE_KEY_FIELDS = [
   ...PROVIDER_COMMON_KEY_FIELDS,
   'cloak',
@@ -501,6 +504,26 @@ export const providersApi = {
 
   deleteNVIDIAConfig: (apiKey: string, baseUrl?: string) =>
     apiClient.delete(`/nvidia-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
+
+  createZenConfig: (config: ProviderKeyConfig) =>
+    mutateLatestProviderList('zen-api-key', (latestItems) =>
+      appendLatestProviderRecord(latestItems, serializeProviderKey(config), (raw, payload) =>
+        mergeProviderKeyPayload(raw, payload, ZEN_KEY_FIELDS)
+      )
+    ),
+
+  updateZenConfig: (apiKey: string, baseUrl: string | undefined, config: ProviderKeyConfig) =>
+    mutateLatestProviderList('zen-api-key', (latestItems) =>
+      replaceLatestProviderRecord(
+        latestItems,
+        (record) => matchesProviderKey(record, apiKey, baseUrl),
+        serializeProviderKey(config),
+        (raw, payload) => mergeProviderKeyPayload(raw, payload, ZEN_KEY_FIELDS)
+      )
+    ),
+
+  deleteZenConfig: (apiKey: string, baseUrl?: string) =>
+    apiClient.delete(`/zen-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
 
   createClaudeConfig: (config: ProviderKeyConfig) =>
     mutateLatestProviderList('claude-api-key', (latestItems) =>

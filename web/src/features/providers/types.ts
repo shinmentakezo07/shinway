@@ -17,7 +17,8 @@ export type ProviderBrand =
   | 'fennoAI'
   | 'qiniuCloud'
   | 'kimi'
-  | 'nvidiaNim';
+  | 'nvidiaNim'
+  | 'zen';
 
 export type SponsorProviderBrand = 'apikeyFun' | 'code0' | 'fennoAI' | 'qiniuCloud' | 'kimi';
 
@@ -32,6 +33,7 @@ export type ProviderResourceSelector =
   | { brand: 'codex'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'xai'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'nvidiaNim'; apiKey: string; baseUrl?: string; index: number; indices?: number[] }
+  | { brand: 'zen'; apiKey: string; baseUrl?: string; index: number; indices?: number[] }
   | { brand: 'claude'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'claudeApi'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'vertex'; apiKey: string; baseUrl?: string; index: number }

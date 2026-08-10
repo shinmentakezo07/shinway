@@ -118,6 +118,9 @@ type Config struct {
 	// NVIDIA configures provider-wide NVIDIA NIM request behavior.
 	NVIDIA NVIDIAConfig `yaml:"nvidia" json:"nvidia"`
 
+	// ZenKey defines OpenCode Zen API key configurations using the same structure as Codex API keys.
+	ZenKey []ZenKey `yaml:"zen-api-key" json:"zen-api-key"`
+
 	// XAI configures provider-wide xAI request behavior.
 	XAI XAIConfig `yaml:"xai" json:"xai"`
 

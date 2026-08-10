@@ -166,6 +166,20 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
 			}
 		}
 		models = applyExcludedModels(models, excluded)
+	case "zen":
+		// OpenCode Zen has no curated builtin catalog: models are always derived
+		// from the user's config (Quick Fill fetches them from /models at
+		// https://opencode.ai/zen/v1). This keeps the registry truthful about
+		// which model IDs are actually reachable for a given key.
+		if entry := s.resolveConfigZenKey(a); entry != nil {
+			if len(entry.Models) > 0 {
+				models = buildZenConfigModels(entry)
+			}
+			if authKind == "apikey" {
+				excluded = entry.ExcludedModels
+			}
+		}
+		models = applyExcludedModels(models, excluded)
 	default:
 		// Handle OpenAI-compatibility providers by name using config
 		if s.cfg != nil {
@@ -488,6 +502,13 @@ func (s *Service) resolveConfigNVIDIAKey(auth *coreauth.Auth) *config.NVIDIAKey 
 	return resolveConfigCodexStyleKey(auth, s.cfg.NVIDIAKey)
 }
 
+func (s *Service) resolveConfigZenKey(auth *coreauth.Auth) *config.ZenKey {
+	if s == nil || s.cfg == nil {
+		return nil
+	}
+	return resolveConfigCodexStyleKey(auth, s.cfg.ZenKey)
+}
+
 func resolveConfigCodexStyleKey(auth *coreauth.Auth, entries []config.CodexKey) *config.CodexKey {
 	if auth == nil {
 		return nil
@@ -795,6 +816,13 @@ func buildNVIDIAConfigModels(entry *config.NVIDIAKey) []*ModelInfo {
 		return nil
 	}
 	return buildConfigModels(entry.Models, "nvidia", "nvidia")
+}
+
+func buildZenConfigModels(entry *config.ZenKey) []*ModelInfo {
+	if entry == nil {
+		return nil
+	}
+	return buildConfigModels(entry.Models, "opencode", "zen")
 }
 
 func buildCodexConfigModels(entry *config.CodexKey) []*ModelInfo {

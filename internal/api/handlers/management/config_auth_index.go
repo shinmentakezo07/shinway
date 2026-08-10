@@ -33,6 +33,11 @@ type nvidiaKeyWithAuthIndex struct {
 	AuthIndex string `json:"auth-index,omitempty"`
 }
 
+type zenKeyWithAuthIndex struct {
+	config.ZenKey
+	AuthIndex string `json:"auth-index,omitempty"`
+}
+
 type vertexCompatKeyWithAuthIndex struct {
 	config.VertexCompatKey
 	AuthIndex string `json:"auth-index,omitempty"`
@@ -256,6 +261,35 @@ func (h *Handler) nvidiaKeysWithAuthIndex() []nvidiaKeyWithAuthIndex {
 		}
 		out[i] = nvidiaKeyWithAuthIndex{
 			NVIDIAKey: entry,
+			AuthIndex: authIndex,
+		}
+	}
+	return out
+}
+
+func (h *Handler) zenKeysWithAuthIndex() []zenKeyWithAuthIndex {
+	if h == nil {
+		return nil
+	}
+	liveIndexByID := h.liveAuthIndexByID()
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.cfg == nil {
+		return nil
+	}
+
+	idGen := synthesizer.NewStableIDGenerator()
+	out := make([]zenKeyWithAuthIndex, len(h.cfg.ZenKey))
+	for i := range h.cfg.ZenKey {
+		entry := h.cfg.ZenKey[i]
+		authIndex := ""
+		if key := strings.TrimSpace(entry.APIKey); key != "" {
+			id, _ := idGen.Next("zen:apikey", key, entry.BaseURL)
+			authIndex = liveIndexByID[id]
+		}
+		out[i] = zenKeyWithAuthIndex{
+			ZenKey:    entry,
 			AuthIndex: authIndex,
 		}
 	}

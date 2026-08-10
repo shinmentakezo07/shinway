@@ -632,7 +632,16 @@ export function UsagePage() {
 
   return (
     <div className={styles.container}>
+      {/* Decorative background orbs */}
+      <div className={styles.orbs} aria-hidden="true">
+        <div className={styles.orb1} />
+        <div className={styles.orb2} />
+      </div>
+
       <div className={styles.pageHeaderRow}>
+        <span className={styles.pageWatermark} aria-hidden="true">
+          USAGE
+        </span>
         <div>
           <h1 className={styles.pageTitle}>{t('usage.title')}</h1>
           <p className={styles.description}>{t('usage.description')}</p>
@@ -755,7 +764,7 @@ export function UsagePage() {
           </div>
 
           {/* Time-series chart */}
-          <Card title={t('usage.chart_title')}>
+          <Card title={t('usage.chart_title')} className={styles.glassCard}>
             {stats.series && stats.series.length > 0 ? (
               <LineChart points={stats.series} bucketSeconds={stats.bucket_seconds} t={t} />
             ) : (
@@ -812,6 +821,7 @@ export function UsagePage() {
           {/* Per-dimension breakdown */}
           <Card
             title={t('usage.breakdown_title')}
+            className={styles.glassCard}
             extra={
               <div className={styles.rangeButtons}>
                 {(['model', 'provider', 'api_key', 'auth'] as const).map((dim) => (
@@ -880,6 +890,7 @@ export function UsagePage() {
           {/* Request log */}
           <Card
             title={t('usage.records_title')}
+            className={styles.glassCard}
             extra={
               <div className={styles.recordsControls}>
                 <div className={styles.searchWrap}>

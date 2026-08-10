@@ -300,6 +300,15 @@ func (s *Service) registerExecutorForAuth(a *coreauth.Auth, forceReplace bool) {
 			}
 		}
 		s.coreManager.RegisterExecutor(executor.NewNVIDIAExecutor(cfg))
+	case "zen":
+		if !forceReplace {
+			if existingExecutor, hasExecutor := s.coreManager.Executor("zen"); hasExecutor {
+				if _, isZenExecutor := existingExecutor.(*executor.ZenExecutor); isZenExecutor {
+					return
+				}
+			}
+		}
+		s.coreManager.RegisterExecutor(executor.NewZenExecutor(cfg))
 	default:
 		providerKey := strings.ToLower(strings.TrimSpace(a.Provider))
 		if providerKey == "" {

@@ -23,8 +23,10 @@ import {
   fennoAIToResource,
   geminiToResource,
   groupNvidiaEntries,
+  groupZenEntries,
   nvidiaToResource,
   openaiToResource,
+  zenToResource,
   qiniuCloudToResource,
   kimiToResource,
   vertexToResource,
@@ -153,7 +155,7 @@ const buildModelAliases = (
     .filter((m) => m.name);
 
 const buildProviderKeyConfig = (
-  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'claude' | 'vertex',
+  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'zen' | 'claude' | 'vertex',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | GeminiKeyConfig | null
 ): ProviderKeyConfig | GeminiKeyConfig => {
@@ -361,11 +363,12 @@ const toggleSponsorConfig = async (raw: SponsorProviderRaw, disabled: boolean) =
   }
 };
 
-const buildNvidiaConfig = (
+const buildMultiKeyProviderConfig = (
+  brand: 'nvidiaNim' | 'zen',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | null
 ): ProviderKeyConfig => {
-  const raw = buildProviderKeyConfig('nvidiaNim', input, existing ?? undefined) as ProviderKeyConfig;
+  const raw = buildProviderKeyConfig(brand, input, existing ?? undefined) as ProviderKeyConfig;
   const existingEntries = existing?.apiKeyEntries ?? [];
   const apiKeyEntries: ApiKeyEntry[] = [];
   (input.apiKeyEntries ?? []).forEach((entry, index) => {
@@ -386,6 +389,16 @@ const buildNvidiaConfig = (
     apiKeyEntries,
   };
 };
+
+const buildNvidiaConfig = (
+  input: ProviderEntryFormInput,
+  existing?: ProviderKeyConfig | null
+): ProviderKeyConfig => buildMultiKeyProviderConfig('nvidiaNim', input, existing);
+
+const buildZenConfig = (
+  input: ProviderEntryFormInput,
+  existing?: ProviderKeyConfig | null
+): ProviderKeyConfig => buildMultiKeyProviderConfig('zen', input, existing);
 
 /* -------------------------------------------------------------------------- */
 /* hook                                                                       */
@@ -489,6 +502,23 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               ...resource,
               selector: {
                 brand: 'nvidiaNim',
+                apiKey: firstEntry?.apiKey ?? '',
+                baseUrl: group.raw.baseUrl,
+                index: primaryIndex,
+                indices: group.indices,
+              },
+            };
+          });
+          break;
+        case 'zen':
+          resources = groupZenEntries(config).map((group, groupIndex) => {
+            const primaryIndex = group.indices[0] ?? groupIndex;
+            const resource = zenToResource(group.raw, primaryIndex);
+            const firstEntry = group.raw.apiKeyEntries?.[0];
+            return {
+              ...resource,
+              selector: {
+                brand: 'zen',
                 apiKey: firstEntry?.apiKey ?? '',
                 baseUrl: group.raw.baseUrl,
                 index: primaryIndex,
@@ -721,6 +751,18 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               apiKeyEntries: undefined,
             });
           }
+        } else if (brand === 'zen') {
+          const built = buildZenConfig(input);
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const entry = built.apiKeyEntries?.[i];
+            await providersApi.createZenConfig({
+              ...built,
+              apiKey: entry?.apiKey ?? built.apiKey ?? '',
+              proxyUrl: entry?.proxyUrl ?? built.proxyUrl,
+              apiKeyEntries: undefined,
+            });
+          }
         } else if (brand === 'claude') {
           await providersApi.createClaudeConfig(
             buildProviderKeyConfig('claude', input) as ProviderKeyConfig
@@ -802,6 +844,31 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               });
             }
           }
+        } else if (brand === 'zen' && selector.brand === 'zen') {
+          const existing = resource.raw as ProviderKeyConfig;
+          const built = buildZenConfig(input, existing);
+          const oldIndices = selector.indices ?? [selector.index];
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, oldIndices.length, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const oldIndex = oldIndices[i];
+            const oldConfig = config?.zenApiKeys?.[oldIndex];
+            const entry = built.apiKeyEntries?.[i];
+            if (oldConfig && entry) {
+              await providersApi.updateZenConfig(oldConfig.apiKey, oldConfig.baseUrl, {
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            } else if (oldConfig && !entry) {
+              await providersApi.deleteZenConfig(oldConfig.apiKey, oldConfig.baseUrl);
+            } else if (entry) {
+              await providersApi.createZenConfig({
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            }
+          }
         } else if (brand === 'claude' && selector.brand === 'claude') {
           const existing = resource.raw as ProviderKeyConfig;
           await providersApi.updateClaudeConfig(
@@ -872,6 +939,16 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           }
           const next = (config?.nvidiaApiKeys ?? []).filter((_, i) => !indices.includes(i));
           updateConfigValue('nvidia-api-key', next);
+        } else if (sel.brand === 'zen') {
+          const indices = sel.indices ?? [sel.index];
+          const configs = indices
+            .map((i) => config?.zenApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            await providersApi.deleteZenConfig(cfg.apiKey, cfg.baseUrl);
+          }
+          const next = (config?.zenApiKeys ?? []).filter((_, i) => !indices.includes(i));
+          updateConfigValue('zen-api-key', next);
         } else if (sel.brand === 'claude') {
           await providersApi.deleteClaudeConfig(sel.apiKey, sel.baseUrl);
           const next = (config?.claudeApiKeys ?? []).filter((_, i) => i !== sel.index);
@@ -972,6 +1049,20 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             await providersApi.updateNVIDIAConfig(cfg.apiKey, cfg.baseUrl, {
               ...cfg,
               excludedModels: excluded,
+            });
+          }
+        } else if (brand === 'zen' && selector.brand === 'zen') {
+          const indices = selector.indices ?? [selector.index];
+          const configs = indices
+            .map((i) => config?.zenApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            const excludedModels = disabled
+              ? withDisableAllModelsRule(cfg.excludedModels)
+              : withoutDisableAllModelsRule(cfg.excludedModels);
+            await providersApi.updateZenConfig(cfg.apiKey, cfg.baseUrl, {
+              ...cfg,
+              excludedModels,
             });
           }
         } else if (brand === 'openaiCompatibility' && selector.brand === 'openaiCompatibility') {

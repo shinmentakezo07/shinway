@@ -461,6 +461,12 @@ type NVIDIAKey = CodexKey
 // NVIDIAModel uses the Codex model mapping structure for NVIDIA NIM models.
 type NVIDIAModel = CodexModel
 
+// ZenKey uses the Codex API key structure for native OpenCode Zen execution.
+type ZenKey = CodexKey
+
+// ZenModel uses the Codex model mapping structure for OpenCode Zen models.
+type ZenModel = CodexModel
+
 // NVIDIAConfig configures provider-wide NVIDIA NIM request behavior.
 type NVIDIAConfig struct {
 	// DefaultThinking controls whether requests without an explicit thinking suffix or

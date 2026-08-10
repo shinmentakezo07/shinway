@@ -33,6 +33,7 @@ import {
   resolveKimiBaseUrl,
 } from './kimi';
 import { NVIDIA_NIM_DISPLAY_NAME } from './nvidiaNim';
+import { ZEN_DISPLAY_NAME } from './zen';
 import type {
   ProviderBrand,
   ProviderResource,
@@ -67,7 +68,15 @@ const truncateForId = (value: string | undefined | null): string => {
 };
 
 function providerKeyToResource(
-  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'claude' | 'claudeApi' | 'vertex',
+  brand:
+    | 'gemini'
+    | 'codex'
+    | 'xai'
+    | 'nvidiaNim'
+    | 'zen'
+    | 'claude'
+    | 'claudeApi'
+    | 'vertex',
   config: GeminiKeyConfig | ProviderKeyConfig,
   index: number
 ): ProviderResource {
@@ -139,13 +148,34 @@ export function nvidiaToResource(config: ProviderKeyConfig, index: number): Prov
   };
 }
 
+export function zenToResource(config: ProviderKeyConfig, index: number): ProviderResource {
+  const resource = providerKeyToResource('zen', config, index);
+  const entries = config.apiKeyEntries?.length
+    ? config.apiKeyEntries
+    : [{ apiKey: config.apiKey ?? '', proxyUrl: config.proxyUrl }];
+  return {
+    ...resource,
+    name: resource.name ?? ZEN_DISPLAY_NAME,
+    apiKeyEntryCount: entries.length,
+    raw: { ...config, apiKeyEntries: entries },
+  };
+}
+
 export interface NvidiaNimGroup {
   entries: ProviderKeyConfig[];
   indices: number[];
   raw: ProviderKeyConfig;
 }
 
-const nvidiaGroupKey = (item: ProviderKeyConfig) =>
+export interface ZenGroup {
+  entries: ProviderKeyConfig[];
+  indices: number[];
+  raw: ProviderKeyConfig;
+}
+
+type ProviderKeyGroup = NvidiaNimGroup | ZenGroup;
+
+const providerKeyGroupSignature = (item: ProviderKeyConfig) =>
   JSON.stringify([
     item.baseUrl ?? '',
     item.prefix ?? '',
@@ -157,12 +187,14 @@ const nvidiaGroupKey = (item: ProviderKeyConfig) =>
     item.excludedModels ?? [],
   ]);
 
-export function groupNvidiaEntries(config: Config | null | undefined): NvidiaNimGroup[] {
-  const list = config?.nvidiaApiKeys ?? [];
-  const byKey = new Map<string, NvidiaNimGroup>();
+function groupProviderKeyEntries(
+  list: ProviderKeyConfig[],
+  groupKey: (item: ProviderKeyConfig) => string
+): ProviderKeyGroup[] {
+  const byKey = new Map<string, ProviderKeyGroup>();
 
   list.forEach((item, index) => {
-    const configKey = nvidiaGroupKey(item);
+    const configKey = groupKey(item);
     const entry: ProviderKeyConfig = {
       apiKey: item.apiKey ?? '',
       proxyUrl: item.proxyUrl?.trim() || undefined,
@@ -196,6 +228,14 @@ export function groupNvidiaEntries(config: Config | null | undefined): NvidiaNim
       apiKeyEntries: group.entries,
     },
   }));
+}
+
+export function groupNvidiaEntries(config: Config | null | undefined): NvidiaNimGroup[] {
+  return groupProviderKeyEntries(config?.nvidiaApiKeys ?? [], providerKeyGroupSignature);
+}
+
+export function groupZenEntries(config: Config | null | undefined): ZenGroup[] {
+  return groupProviderKeyEntries(config?.zenApiKeys ?? [], providerKeyGroupSignature);
 }
 
 export function claudeToResource(config: ProviderKeyConfig, index: number): ProviderResource {

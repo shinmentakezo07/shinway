@@ -412,6 +412,9 @@ func BuildAPIKeyClients(cfg *config.Config) (int, int, int, int, int, int) {
 	if len(cfg.NVIDIAKey) > 0 {
 		xaiAPIKeyCount += len(cfg.NVIDIAKey)
 	}
+	if len(cfg.ZenKey) > 0 {
+		xaiAPIKeyCount += len(cfg.ZenKey)
+	}
 	if len(cfg.OpenAICompatibility) > 0 {
 		for _, compatConfig := range cfg.OpenAICompatibility {
 			if compatConfig.Disabled {

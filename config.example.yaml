@@ -419,6 +419,34 @@ nonstream-keepalive-interval: 0
 #                          # for plain requests on models without an explicit thinking intent.
 #                          # Set to false to opt out of the auto-think default.
 
+# OpenCode Zen API keys (https://opencode.ai/zen)
+# Curated OpenAI-compatible gateway from the OpenCode team. Chat completions are
+# served at https://opencode.ai/zen/v1/chat/completions; get an API key from
+# https://opencode.ai/auth. Multiple entries round-robin automatically; use
+# "weight" for weighted selection. Model IDs use the plain upstream names
+# (e.g. "glm-5.2", "deepseek-v4-pro", "kimi-k3").
+# Only the chat-completions-served model families (GLM, DeepSeek, Kimi, MiniMax,
+# free promo models) are supported; Zen's GPT/Claude/Qwen/Gemini families use
+# different endpoint shapes and are not routed through this provider.
+# zen-api-key:
+#   - api-key: "oc-..."
+#     weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
+#     prefix: "zen" # optional: require calls like "zen/glm-5.2" to target this credential
+#     disable-cooling: false # optional: per-auth override for auth/model cooldown scheduling
+#     base-url: "https://opencode.ai/zen/v1" # optional; defaults to the hosted Zen endpoint
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     proxy-url: "socks5://proxy.example.com:1080"
+#     models:
+#       - name: "glm-5.2"
+#         alias: "glm-5.2"
+#         display-name: "GLM 5.2"
+#         force-mapping: true
+#       - name: "deepseek-v4-pro"
+#         alias: "dsv4-pro"
+#     excluded-models:
+#       - "*-free" # exclude the free promo models, for example
+
 # Claude API keys
 # claude-api-key:
 #   - api-key: "sk-atSM..." # use the official claude API key, no need to set the base url

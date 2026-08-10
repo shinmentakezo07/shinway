@@ -143,6 +143,11 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/nvidia-api-key", s.mgmt.PatchNVIDIAKey)
 		mgmt.DELETE("/nvidia-api-key", s.mgmt.DeleteNVIDIAKey)
 
+		mgmt.GET("/zen-api-key", s.mgmt.GetZenKeys)
+		mgmt.PUT("/zen-api-key", s.mgmt.PutZenKeys)
+		mgmt.PATCH("/zen-api-key", s.mgmt.PatchZenKey)
+		mgmt.DELETE("/zen-api-key", s.mgmt.DeleteZenKey)
+
 		mgmt.GET("/openai-compatibility", s.mgmt.GetOpenAICompat)
 		mgmt.PUT("/openai-compatibility", s.mgmt.PutOpenAICompat)
 		mgmt.PATCH("/openai-compatibility", s.mgmt.PatchOpenAICompat)

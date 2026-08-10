@@ -370,6 +370,10 @@ func (m *Manager) resolveAPIKeyModelAliasWithResult(auth *Auth, requestedModel s
 		if entry := resolveNVIDIAAPIKeyConfig(cfg, auth); entry != nil {
 			models = asModelAliasEntries(entry.Models)
 		}
+	case "zen":
+		if entry := resolveZenAPIKeyConfig(cfg, auth); entry != nil {
+			models = asModelAliasEntries(entry.Models)
+		}
 	case "vertex":
 		if entry := resolveVertexAPIKeyConfig(cfg, auth); entry != nil {
 			models = asModelAliasEntries(entry.Models)
@@ -498,6 +502,10 @@ func (m *Manager) rebuildAPIKeyModelAliasLocked(cfg *internalconfig.Config) {
 			}
 		case "nvidia":
 			if entry := resolveNVIDIAAPIKeyConfig(cfg, auth); entry != nil {
+				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
+			}
+		case "zen":
+			if entry := resolveZenAPIKeyConfig(cfg, auth); entry != nil {
 				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
 			}
 		case "vertex":
@@ -629,6 +637,8 @@ func (m *Manager) applyAPIKeyModelAlias(auth *Auth, requestedModel string) strin
 		upstreamModel = resolveUpstreamModelForXAIAPIKey(cfg, auth, requestedModel)
 	case "nvidia":
 		upstreamModel = resolveUpstreamModelForNVIDIAAPIKey(cfg, auth, requestedModel)
+	case "zen":
+		upstreamModel = resolveUpstreamModelForZenAPIKey(cfg, auth, requestedModel)
 	case "vertex":
 		upstreamModel = resolveUpstreamModelForVertexAPIKey(cfg, auth, requestedModel)
 	default:
@@ -729,6 +739,13 @@ func resolveNVIDIAAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internal
 	return resolveAPIKeyConfig(cfg.NVIDIAKey, auth)
 }
 
+func resolveZenAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalconfig.ZenKey {
+	if cfg == nil {
+		return nil
+	}
+	return resolveAPIKeyConfig(cfg.ZenKey, auth)
+}
+
 func resolveVertexAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalconfig.VertexCompatKey {
 	if cfg == nil {
 		return nil
@@ -778,6 +795,14 @@ func resolveUpstreamModelForXAIAPIKey(cfg *internalconfig.Config, auth *Auth, re
 
 func resolveUpstreamModelForNVIDIAAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
 	entry := resolveNVIDIAAPIKeyConfig(cfg, auth)
+	if entry == nil {
+		return ""
+	}
+	return resolveModelAliasFromConfigModels(requestedModel, asModelAliasEntries(entry.Models))
+}
+
+func resolveUpstreamModelForZenAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
+	entry := resolveZenAPIKeyConfig(cfg, auth)
 	if entry == nil {
 		return ""
 	}

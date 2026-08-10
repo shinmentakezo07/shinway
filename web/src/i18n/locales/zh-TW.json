@@ -1430,7 +1430,8 @@
       "fennoAI": "FennoAI",
       "qiniuCloud": "七牛雲",
       "kimi": "Kimi",
-      "nvidiaNim": "NVIDIA NIM"
+      "nvidiaNim": "NVIDIA NIM",
+      "zen": "OpenCode Zen"
     },
     "table": {
       "key": "金鑰",

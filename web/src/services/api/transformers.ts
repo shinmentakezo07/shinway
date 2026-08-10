@@ -364,6 +364,13 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
       .filter(Boolean) as ProviderKeyConfig[];
   }
 
+  const zenList = raw['zen-api-key'];
+  if (Array.isArray(zenList)) {
+    config.zenApiKeys = zenList
+      .map((item) => normalizeProviderKeyConfig(item))
+      .filter(Boolean) as ProviderKeyConfig[];
+  }
+
   const claudeList = raw['claude-api-key'];
   if (Array.isArray(claudeList)) {
     config.claudeApiKeys = claudeList

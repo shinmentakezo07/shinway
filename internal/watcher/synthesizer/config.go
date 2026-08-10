@@ -54,6 +54,8 @@ func (s *ConfigSynthesizer) Synthesize(ctx *SynthesisContext) ([]*coreauth.Auth,
 	out = append(out, s.synthesizeXAIKeys(ctx)...)
 	// NVIDIA NIM API Keys
 	out = append(out, s.synthesizeNVIDIAKeys(ctx)...)
+	// OpenCode Zen API Keys
+	out = append(out, s.synthesizeZenKeys(ctx)...)
 	// OpenAI-compat
 	out = append(out, s.synthesizeOpenAICompat(ctx)...)
 	// Vertex-compat
@@ -201,6 +203,11 @@ func (s *ConfigSynthesizer) synthesizeXAIKeys(ctx *SynthesisContext) []*coreauth
 // synthesizeNVIDIAKeys creates Auth entries for NVIDIA NIM API keys.
 func (s *ConfigSynthesizer) synthesizeNVIDIAKeys(ctx *SynthesisContext) []*coreauth.Auth {
 	return s.synthesizeCodexStyleKeys(ctx, ctx.Config.NVIDIAKey, "nvidia")
+}
+
+// synthesizeZenKeys creates Auth entries for OpenCode Zen API keys.
+func (s *ConfigSynthesizer) synthesizeZenKeys(ctx *SynthesisContext) []*coreauth.Auth {
+	return s.synthesizeCodexStyleKeys(ctx, ctx.Config.ZenKey, "zen")
 }
 
 func (s *ConfigSynthesizer) synthesizeCodexStyleKeys(ctx *SynthesisContext, entries []config.CodexKey, provider string) []*coreauth.Auth {

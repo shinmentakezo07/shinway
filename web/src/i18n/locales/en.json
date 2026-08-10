@@ -1404,7 +1404,8 @@
       "fennoAI": "FennoAI",
       "qiniuCloud": "Qiniu Cloud",
       "kimi": "Kimi",
-      "nvidiaNim": "NVIDIA NIM"
+      "nvidiaNim": "NVIDIA NIM",
+      "zen": "OpenCode Zen"
     },
     "table": {
       "key": "Key",

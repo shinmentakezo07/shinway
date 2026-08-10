@@ -165,6 +165,9 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// Sanitize NVIDIA NIM keys: default empty base-url to the hosted endpoint
 	cfg.SanitizeNVIDIAKeys()
 
+	// Sanitize OpenCode Zen keys: default empty base-url to the hosted endpoint
+	cfg.SanitizeZenKeys()
+
 	// Sanitize Codex header defaults.
 	cfg.SanitizeCodexHeaderDefaults()
 

@@ -27,6 +27,7 @@ export interface Config {
   codexApiKeys?: ProviderKeyConfig[];
   xaiApiKeys?: ProviderKeyConfig[];
   nvidiaApiKeys?: ProviderKeyConfig[];
+  zenApiKeys?: ProviderKeyConfig[];
   claudeApiKeys?: ProviderKeyConfig[];
   vertexApiKeys?: ProviderKeyConfig[];
   openaiCompatibility?: OpenAIProviderConfig[];
@@ -50,6 +51,7 @@ export type RawConfigSection =
   | 'codex-api-key'
   | 'xai-api-key'
   | 'nvidia-api-key'
+  | 'zen-api-key'
   | 'claude-api-key'
   | 'vertex-api-key'
   | 'openai-compatibility'

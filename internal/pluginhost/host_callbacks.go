@@ -175,6 +175,7 @@ func (h *Host) callHostHTTPDoStream(ctx context.Context, request []byte) ([]byte
 		cancel()
 		return nil, fmt.Errorf("host http stream bridge is unavailable")
 	}
+	_ = cancel
 	return marshalRPCResult(rpcHostHTTPStreamResponse{
 		StatusCode: resp.StatusCode,
 		Headers:    httpHeader(resp.Headers),

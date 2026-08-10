@@ -7,30 +7,140 @@
   max-width: 1240px;
   margin: 0 auto;
   width: 100%;
+  position: relative;
 }
 
-/* ---------- Header ---------- */
+/* All content sits above the decorative orbs */
+.container > *:not(.orbs) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Decorative background orbs ---------- */
+
+.orbs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  filter: blur(16px);
+  opacity: 0.4;
+}
+
+.orb1 {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary-color) 6%, transparent),
+    transparent 70%
+  );
+  top: -150px;
+  right: -100px;
+  animation: orbFloat 22s ease-in-out infinite alternate;
+}
+
+.orb2 {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--success-color) 5%, transparent),
+    transparent 70%
+  );
+  bottom: 8%;
+  left: -120px;
+  animation: orbFloat 28s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes orbFloat {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(30px, -20px) scale(1.1);
+  }
+}
+
+/* ---------- Header (glass hero) ---------- */
 
 .pageHeaderRow {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   flex-wrap: wrap;
-  gap: $spacing-md;
+  gap: $spacing-lg;
+  padding: $spacing-xl $spacing-lg $spacing-lg;
+  border-radius: $radius-lg;
+  --glass-blur: 12px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--bg-primary) 92%, transparent),
+    color-mix(in srgb, var(--bg-secondary) 80%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  overflow: hidden;
+  animation: heroEnter 0.6s ease-out both;
+
+  & > div {
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: $breakpoint-mobile) {
+    flex-direction: column;
+    align-items: stretch;
+    padding: $spacing-lg $spacing-md;
+  }
+}
+
+.pageWatermark {
+  position: absolute;
+  top: 50%;
+  left: $spacing-lg;
+  transform: translateY(-50%);
+  font-size: 96px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  opacity: 0.05;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  animation: watermarkEnter 0.8s ease-out 0.1s both;
+
+  @media (max-width: $breakpoint-mobile) {
+    font-size: 54px;
+    left: $spacing-md;
+  }
 }
 
 .pageTitle {
-  font-size: 22px;
-  font-weight: 650;
+  font-size: 26px;
+  font-weight: 800;
   letter-spacing: -0.01em;
-  margin: 0 0 4px;
+  margin: 0 0 5px;
   color: var(--text-primary);
+  animation: fadeSlideUp 0.5s ease-out 0.15s both;
 }
 
 .description {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 13.5px;
+  max-width: 540px;
+  animation: fadeSlideUp 0.5s ease-out 0.22s both;
 }
 
 .controls {
@@ -38,6 +148,7 @@
   align-items: center;
   gap: $spacing-sm;
   flex-wrap: wrap;
+  animation: fadeSlideUp 0.5s ease-out 0.28s both;
 }
 
 /* ---------- Segmented controls ---------- */
@@ -46,9 +157,11 @@
   display: inline-flex;
   padding: 3px;
   gap: 2px;
-  border: 1px solid var(--border-color);
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
   border-radius: $radius-full;
-  background: var(--bg-primary);
+  background: var(--glass-bg-secondary);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .rangeButton {
@@ -138,7 +251,7 @@
   }
 }
 
-/* ---------- Stat cards ---------- */
+/* ---------- Stat cards (glass + tone accent) ---------- */
 
 .statGrid {
   display: grid;
@@ -146,13 +259,50 @@
   gap: $spacing-md;
 }
 
+.statGrid > * {
+  animation: cardEnter 0.5s ease-out both;
+}
+.statGrid > *:nth-child(1) {
+  animation-delay: 70ms;
+}
+.statGrid > *:nth-child(2) {
+  animation-delay: 120ms;
+}
+.statGrid > *:nth-child(3) {
+  animation-delay: 170ms;
+}
+.statGrid > *:nth-child(4) {
+  animation-delay: 220ms;
+}
+.statGrid > *:nth-child(5) {
+  animation-delay: 270ms;
+}
+.statGrid > *:nth-child(6) {
+  animation-delay: 320ms;
+}
+.statGrid > *:nth-child(7) {
+  animation-delay: 370ms;
+}
+.statGrid > *:nth-child(n + 8) {
+  animation-delay: 420ms;
+}
+
 .statCard {
   position: relative;
-  padding: 14px $spacing-md 13px;
-  background: var(--bg-primary);
+  padding: 15px $spacing-md 13px;
+  --glass-blur: 12px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--bg-primary) 90%, transparent),
+    color-mix(in srgb, var(--bg-secondary) 72%, transparent)
+  );
   border-radius: $radius-lg;
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow);
+  border: 1px solid color-mix(in srgb, var(--border-color) 66%, transparent);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow:
+    0 10px 24px rgb(0 0 0 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -170,12 +320,15 @@
     width: 3px;
     background: transparent;
     z-index: 1;
+    border-radius: $radius-lg 0 0 $radius-lg;
   }
 
   &:hover {
-    box-shadow: var(--shadow-lg);
-    border-color: var(--border-hover);
-    transform: translateY(-1px);
+    box-shadow:
+      0 16px 32px rgb(0 0 0 / 0.1),
+      inset 0 1px 0 rgb(255 255 255 / 0.04);
+    border-color: color-mix(in srgb, var(--border-hover) 80%, transparent);
+    transform: translateY(-2px);
   }
 }
 
@@ -188,7 +341,7 @@
     var(--tone-tint, transparent) 0%,
     transparent 60%
   );
-  opacity: 0.08;
+  opacity: 0.1;
 }
 
 .tone-info {
@@ -218,9 +371,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: $radius-md;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   color: var(--text-secondary);
   background: var(--bg-tertiary);
   flex-shrink: 0;
@@ -303,7 +456,7 @@
 }
 
 .statValue {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -432,7 +585,7 @@
 
 .areaStopTop {
   stop-color: #3b82f6;
-  stop-opacity: 0.28;
+  stop-opacity: 0.3;
 }
 
 .areaStopBottom {
@@ -442,10 +595,11 @@
 
 .lineTotal {
   stroke: #3b82f6;
-  stroke-width: 2.2;
+  stroke-width: 2.4;
   stroke-linejoin: round;
   stroke-linecap: round;
   fill: #3b82f6;
+  filter: drop-shadow(0 2px 6px rgba(59, 130, 246, 0.35));
 }
 
 .lineInput {
@@ -542,19 +696,20 @@
 }
 
 .tooltip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: $spacing-sm;
-  padding: 5px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: $radius-full;
-  background: var(--bg-tertiary);
+  padding: 7px 13px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+  border-radius: $radius-md;
+  background: var(--floating-surface);
+  box-shadow: var(--floating-shadow);
   font-size: 11.5px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   opacity: 0;
-  transform: translateY(2px);
+  transform: translateY(4px) scale(0.98);
   transition:
     opacity $transition-fast,
     transform $transition-fast;
@@ -562,7 +717,7 @@
 
 .tooltipVisible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 .tooltipTime {
@@ -835,6 +990,19 @@
   align-items: stretch;
 }
 
+.vizGrid > :global(.card) {
+  animation: cardEnter 0.5s ease-out both;
+}
+.vizGrid > :global(.card):nth-child(1) {
+  animation-delay: 120ms;
+}
+.vizGrid > :global(.card):nth-child(2) {
+  animation-delay: 170ms;
+}
+.vizGrid > :global(.card):nth-child(3) {
+  animation-delay: 220ms;
+}
+
 /* At ~2-col widths (typical page), let the scatter span the full bottom row */
 @media (min-width: 1100px) {
   .vizGrid {
@@ -1055,13 +1223,84 @@
   }
 }
 
+/* ---------- Section cards (subtle glass + entrance) ---------- */
+
+.glassCard {
+  --glass-blur: 12px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--bg-primary) 92%, transparent),
+    color-mix(in srgb, var(--bg-secondary) 80%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow:
+    0 12px 28px rgb(0 0 0 / 0.07),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+  animation: enterUp 0.5s ease-out both;
+}
+
+/* ---------- Animations ---------- */
+
+@keyframes heroEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes enterUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes watermarkEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-20px);
+  }
+  to {
+    opacity: 0.05;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: $breakpoint-mobile) {
-  .pageHeaderRow {
-    flex-direction: column;
-    align-items: stretch;
-  }
   .barRow {
     grid-template-columns: minmax(0, 110px) 1fr 56px;
   }
@@ -1074,5 +1313,23 @@
   .chartFooter {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .orb1,
+  .orb2 {
+    animation: none;
+  }
+  .pageHeaderRow,
+  .pageTitle,
+  .description,
+  .controls,
+  .pageWatermark,
+  .statGrid > *,
+  .vizGrid > :global(.card),
+  .glassCard {
+    animation: none !important;
   }
 }
