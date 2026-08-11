@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
+	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 )
 
 type GeminiModelsSummary struct {
@@ -41,7 +42,7 @@ func SummarizeGeminiModels(models []config.GeminiModel) GeminiModelsSummary {
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return GeminiModelsSummary{
@@ -62,7 +63,7 @@ func SummarizeClaudeModels(models []config.ClaudeModel) ClaudeModelsSummary {
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return ClaudeModelsSummary{
@@ -83,11 +84,7 @@ func SummarizeCodexModels(models []config.CodexModel) CodexModelsSummary {
 			if name == "" && alias == "" {
 				continue
 			}
-			forceMapping := "false"
-			if model.ForceMapping {
-				forceMapping = "true"
-			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName) + "|force-mapping=" + forceMapping)
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return CodexModelsSummary{
@@ -111,7 +108,7 @@ func SummarizeVertexModels(models []config.VertexCompatModel) VertexModelsSummar
 		if alias != "" {
 			name = alias
 		}
-		names = append(names, name+"|"+strings.TrimSpace(model.DisplayName))
+		names = append(names, modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 	}
 	if len(names) == 0 {
 		return VertexModelsSummary{}
@@ -123,3 +120,5 @@ func SummarizeVertexModels(models []config.VertexCompatModel) VertexModelsSummar
 		count: len(names),
 	}
 }
+
+var _ *registry.ThinkingSupport

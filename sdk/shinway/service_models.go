@@ -673,6 +673,15 @@ type modelEntry interface {
 	GetName() string
 	GetAlias() string
 	GetDisplayName() string
+	GetThinking() *registry.ThinkingSupport
+}
+
+type modelMaxContextLengthEntry interface {
+	GetMaxContextLength() int
+}
+
+type modelCompatEntry interface {
+	GetIsCompat() bool
 }
 
 func buildConfiguredModelInfo(model modelEntry, ownedBy, modelType string, created int64, fallbackDisplayName string, userDefined bool) *ModelInfo {
@@ -691,7 +700,7 @@ func buildConfiguredModelInfo(model modelEntry, ownedBy, modelType string, creat
 	if displayName == "" {
 		displayName = alias
 	}
-	return &ModelInfo{
+	info := &ModelInfo{
 		ID:          alias,
 		Object:      "model",
 		Created:     created,
@@ -700,6 +709,16 @@ func buildConfiguredModelInfo(model modelEntry, ownedBy, modelType string, creat
 		DisplayName: displayName,
 		UserDefined: userDefined,
 	}
+	if maxContextModel, ok := any(model).(modelMaxContextLengthEntry); ok {
+		if maxContextLength := maxContextModel.GetMaxContextLength(); maxContextLength > 0 {
+			info.ContextLength = maxContextLength
+			info.MaxContextLength = maxContextLength
+		}
+	}
+	if compatModel, ok := any(model).(modelCompatEntry); ok {
+		info.IsCompat = compatModel.GetIsCompat()
+	}
+	return info
 }
 
 func buildOpenAICompatibilityConfigModels(compat *config.OpenAICompatibility) []*ModelInfo {
@@ -718,16 +737,45 @@ func buildOpenAICompatibilityConfigModels(compat *config.OpenAICompatibility) []
 		if info == nil {
 			continue
 		}
-		thinking := model.Thinking
-		if thinking == nil && !model.Image {
-			thinking = &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}}
+		thinkingSupport := model.Thinking
+		if thinkingSupport == nil && !model.Image {
+			thinkingSupport = &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}}
 		}
-		info.Thinking = thinking
+		info.Thinking = normalizeConfiguredThinkingSupport(thinkingSupport)
 		info.SupportedInputModalities = normalizeCompatConfigModalities(model.InputModalities)
 		info.SupportedOutputModalities = normalizeCompatConfigModalities(model.OutputModalities)
 		models = append(models, info)
 	}
 	return models
+}
+
+// normalizeConfiguredThinkingSupport snapshots explicit configuration and normalizes
+// user-facing reasoning levels without mutating the active configuration.
+func normalizeConfiguredThinkingSupport(raw *registry.ThinkingSupport) *registry.ThinkingSupport {
+	if raw == nil {
+		return nil
+	}
+	normalized := *raw
+	normalized.Levels = nil
+	seen := make(map[string]struct{}, len(raw.Levels))
+	for _, value := range raw.Levels {
+		level := strings.ToLower(strings.TrimSpace(value))
+		if level == "" {
+			continue
+		}
+		switch level {
+		case "none":
+			normalized.ZeroAllowed = true
+		case "auto":
+			normalized.DynamicAllowed = true
+		}
+		if _, exists := seen[level]; exists {
+			continue
+		}
+		seen[level] = struct{}{}
+		normalized.Levels = append(normalized.Levels, level)
+	}
+	return &normalized
 }
 
 func normalizeCompatConfigModalities(raw []string) []string {
@@ -773,10 +821,10 @@ func buildConfigModels[T modelEntry](models []T, ownedBy, modelType string) []*M
 			continue
 		}
 		seen[key] = struct{}{}
-		if name != "" {
-			if upstream := registry.LookupStaticModelInfo(name); upstream != nil && upstream.Thinking != nil {
-				info.Thinking = upstream.Thinking
-			}
+		if configuredThinking := model.GetThinking(); configuredThinking != nil {
+			info.Thinking = normalizeConfiguredThinkingSupport(configuredThinking)
+		} else if upstream := registry.LookupStaticModelInfo(name); upstream != nil && upstream.Thinking != nil {
+			info.Thinking = upstream.Thinking
 		}
 		out = append(out, info)
 	}

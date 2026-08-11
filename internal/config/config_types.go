@@ -370,8 +370,17 @@ type ClaudeModel struct {
 	// DisplayName is the optional human-readable name shown in model catalogs.
 	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
 
+	// MaxContextLength overrides the context window advertised to clients.
+	MaxContextLength int `yaml:"max-context-length,omitempty" json:"max-context-length,omitempty"`
+
 	// ForceMapping rewrites upstream response model fields back to Alias.
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
+
+	// IsCompat enables compatibility handling for signed thinking blocks.
+	IsCompat bool `yaml:"is-compat,omitempty" json:"is-compat,omitempty"`
+
+	// Thinking configures the reasoning capability for this model.
+	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
 }
 
 func (m ClaudeModel) GetName() string { return m.Name }
@@ -381,6 +390,12 @@ func (m ClaudeModel) GetAlias() string { return m.Alias }
 func (m ClaudeModel) GetDisplayName() string { return m.DisplayName }
 
 func (m ClaudeModel) GetForceMapping() bool { return m.ForceMapping }
+
+func (m ClaudeModel) GetMaxContextLength() int { return m.MaxContextLength }
+func (m ClaudeModel) GetIsCompat() bool        { return m.IsCompat }
+func (m ClaudeModel) GetThinking() *registry.ThinkingSupport {
+	return m.Thinking
+}
 
 // CodexKey represents the configuration for a Codex API key,
 // including the API key itself and an optional base URL for the API endpoint.
@@ -405,6 +420,9 @@ type CodexKey struct {
 
 	// Websockets enables the Responses API websocket transport for this credential.
 	Websockets bool `yaml:"websockets,omitempty" json:"websockets,omitempty"`
+
+	// AlphaSearch allows this credential to serve the Alpha Search endpoint.
+	AlphaSearch bool `yaml:"alpha-search,omitempty" json:"alpha-search,omitempty"`
 
 	// ProxyURL overrides the global proxy setting for this API key if provided.
 	ProxyURL string `yaml:"proxy-url" json:"proxy-url"`
@@ -437,8 +455,17 @@ type CodexModel struct {
 	// DisplayName is the optional human-readable name shown in model catalogs.
 	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
 
+	// MaxContextLength overrides the context window advertised to clients.
+	MaxContextLength int `yaml:"max-context-length,omitempty" json:"max-context-length,omitempty"`
+
 	// ForceMapping rewrites upstream response model fields back to Alias.
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
+
+	// IsCompat enables compatibility handling for this configured model.
+	IsCompat bool `yaml:"is-compat,omitempty" json:"is-compat,omitempty"`
+
+	// Thinking configures the reasoning capability for this model.
+	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
 }
 
 func (m CodexModel) GetName() string { return m.Name }
@@ -448,6 +475,12 @@ func (m CodexModel) GetAlias() string { return m.Alias }
 func (m CodexModel) GetDisplayName() string { return m.DisplayName }
 
 func (m CodexModel) GetForceMapping() bool { return m.ForceMapping }
+
+func (m CodexModel) GetMaxContextLength() int { return m.MaxContextLength }
+func (m CodexModel) GetIsCompat() bool        { return m.IsCompat }
+func (m CodexModel) GetThinking() *registry.ThinkingSupport {
+	return m.Thinking
+}
 
 // XAIKey uses the Codex API key structure for native xAI execution.
 type XAIKey = CodexKey
@@ -534,8 +567,17 @@ type GeminiModel struct {
 	// DisplayName is the optional human-readable name shown in model catalogs.
 	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
 
+	// MaxContextLength overrides the context window advertised to clients.
+	MaxContextLength int `yaml:"max-context-length,omitempty" json:"max-context-length,omitempty"`
+
 	// ForceMapping rewrites upstream response model fields back to Alias.
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
+
+	// IsCompat enables compatibility handling for this configured model.
+	IsCompat bool `yaml:"is-compat,omitempty" json:"is-compat,omitempty"`
+
+	// Thinking configures the reasoning capability for this model.
+	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
 }
 
 func (m GeminiModel) GetName() string { return m.Name }
@@ -545,6 +587,12 @@ func (m GeminiModel) GetAlias() string { return m.Alias }
 func (m GeminiModel) GetDisplayName() string { return m.DisplayName }
 
 func (m GeminiModel) GetForceMapping() bool { return m.ForceMapping }
+
+func (m GeminiModel) GetMaxContextLength() int { return m.MaxContextLength }
+func (m GeminiModel) GetIsCompat() bool        { return m.IsCompat }
+func (m GeminiModel) GetThinking() *registry.ThinkingSupport {
+	return m.Thinking
+}
 
 // OpenAICompatibility represents the configuration for OpenAI API compatibility
 // with external providers, allowing model aliases to be routed through OpenAI API format.
@@ -603,6 +651,9 @@ type OpenAICompatibilityModel struct {
 	// DisplayName is the optional human-readable name shown in model catalogs.
 	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
 
+	// MaxContextLength overrides the context window advertised to clients.
+	MaxContextLength int `yaml:"max-context-length,omitempty" json:"max-context-length,omitempty"`
+
 	// ForceMapping rewrites upstream response model fields back to Alias.
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
 
@@ -616,6 +667,9 @@ type OpenAICompatibilityModel struct {
 	// OutputModalities declares supported output modalities when known (e.g. text, image).
 	OutputModalities []string `yaml:"output-modalities,omitempty" json:"output-modalities,omitempty"`
 
+	// IsCompat enables compatibility handling for this configured model.
+	IsCompat bool `yaml:"is-compat,omitempty" json:"is-compat,omitempty"`
+
 	// Thinking configures the thinking/reasoning capability for this model.
 	// If nil, the model defaults to level-based reasoning with levels ["low", "medium", "high"].
 	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
@@ -628,3 +682,9 @@ func (m OpenAICompatibilityModel) GetAlias() string { return m.Alias }
 func (m OpenAICompatibilityModel) GetDisplayName() string { return m.DisplayName }
 
 func (m OpenAICompatibilityModel) GetForceMapping() bool { return m.ForceMapping }
+
+func (m OpenAICompatibilityModel) GetMaxContextLength() int { return m.MaxContextLength }
+func (m OpenAICompatibilityModel) GetIsCompat() bool        { return m.IsCompat }
+func (m OpenAICompatibilityModel) GetThinking() *registry.ThinkingSupport {
+	return m.Thinking
+}

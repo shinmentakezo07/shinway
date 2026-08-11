@@ -1045,7 +1045,7 @@ func (m *Manager) tryAntigravityCreditsExecute(ctx context.Context, req shinwaye
 		}
 		c.auth = preparedAuth
 		publishSelectedAuthMetadata(creditsOpts.Metadata, c.auth)
-		models, pooled, aliasResult := m.executionModelCandidatesWithAlias(c.auth, routeModel)
+		models, pooled, aliasResult, routing := m.executionModelCandidatesWithAliasWithRouting(c.auth, routeModel)
 		if len(models) == 0 {
 			continue
 		}
@@ -1053,6 +1053,7 @@ func (m *Manager) tryAntigravityCreditsExecute(ctx context.Context, req shinwaye
 			resultModel := m.stateModelForExecution(c.auth, routeModel, upstreamModel, pooled)
 			execReq := req
 			execReq.Model = upstreamModel
+			execReq = attachResolvedAPIKeyModelInfo(routing, execReq, c.auth, routeModel, upstreamModel)
 			resp, errExec := c.executor.Execute(creditsCtx, c.auth, execReq, creditsOpts)
 			result := Result{AuthID: c.auth.ID, Provider: c.provider, Model: resultModel, Success: errExec == nil}
 			if errExec != nil {
@@ -1099,11 +1100,11 @@ func (m *Manager) tryAntigravityCreditsExecuteStream(ctx context.Context, req sh
 		}
 		c.auth = preparedAuth
 		publishSelectedAuthMetadata(creditsOpts.Metadata, c.auth)
-		models, pooled, aliasResult := m.executionModelCandidatesWithAlias(c.auth, routeModel)
+		models, pooled, aliasResult, routing := m.executionModelCandidatesWithAliasWithRouting(c.auth, routeModel)
 		if len(models) == 0 {
 			continue
 		}
-		result, errStream := m.executeStreamWithModelPool(creditsCtx, c.executor, c.auth, c.provider, req, creditsOpts, routeModel, "", models, pooled, aliasResult, true, false)
+		result, errStream := m.executeStreamWithModelPool(creditsCtx, c.executor, c.auth, c.provider, req, creditsOpts, routeModel, "", models, pooled, aliasResult, routing, true, false)
 		if errStream != nil {
 			continue
 		}

@@ -32,6 +32,15 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *shinwayauth.Auth, re
 	from := opts.SourceFormat
 	responseFormat := shinwayexecutor.ResponseFormatOrSource(opts)
 	to := sdktranslator.FromString("claude")
+	var replayScope claudeThinkingReplayScope
+	if claudeThinkingReplayEnabled(auth, req, opts) {
+		req, replayScope = prepareClaudeThinkingReplayRequest(ctx, auth, req, opts)
+	}
+	defer func() {
+		if err != nil && replayScope.replayApplied && shouldClearKimiThinkingReplayAfterError(err) {
+			clearClaudeThinkingReplayContent(ctx, replayScope)
+		}
+	}()
 	// Use streaming translation to preserve function calling, except for claude.
 	stream := from != to
 	originalPayloadSource := req.Payload
@@ -39,11 +48,11 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *shinwayauth.Auth, re
 		originalPayloadSource = opts.OriginalRequest
 	}
 	originalPayload := originalPayloadSource
-	originalTranslated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, stream)
-	body := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, stream)
+	originalTranslated := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, stream, helps.APIKeyModelIsCompat(req))
+	body := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, stream, helps.APIKeyModelIsCompat(req))
 	body = helps.SetStringIfDifferent(body, "model", upstreamModel)
 
-	body, err = thinking.ApplyThinking(body, req.Model, from.String(), to.String(), e.Identifier())
+	body, err = helps.ApplyRequestThinking(body, req, opts, from.String(), to.String(), e.Identifier())
 	if err != nil {
 		return resp, err
 	}
@@ -94,7 +103,7 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *shinwayauth.Auth, re
 	if oauthToken {
 		bodyForUpstream, oauthToolNamesReverseMap = prepareClaudeOAuthToolNamesForUpstream(bodyForUpstream, claudeToolPrefix, auth.ToolPrefixDisabled())
 	}
-	bodyForUpstream = sanitizeClaudeMessagesForClaudeUpstreamWithDebug(ctx, bodyForUpstream, baseModel)
+	bodyForUpstream = sanitizeClaudeMessagesForClaudeUpstreamWithDebug(ctx, bodyForUpstream, baseModel, helps.APIKeyModelIsCompat(req))
 	// Enable cch signing by default for OAuth tokens (not just experimental flag).
 	// Claude Code always computes cch; missing or invalid cch is a detectable fingerprint.
 	if oauthToken || experimentalCCHSigningEnabled(e.cfg, auth) {
@@ -198,6 +207,7 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *shinwayauth.Auth, re
 		reporter.Publish(ctx, helps.ParseClaudeUsage(data))
 		data = restoreClaudeOAuthToolNamesFromResponse(data, claudeToolPrefix, auth.ToolPrefixDisabled(), oauthToolNamesReverseMap)
 	}
+	cacheClaudeThinkingReplayResponse(ctx, replayScope, data)
 	data = e.restoreResponseModel(data, req.Model)
 	var param any
 	out := sdktranslator.TranslateNonStream(

@@ -35,6 +35,16 @@ var (
 // - max_output_tokens -> max_tokens
 // - stream passthrough via parameter
 func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte, stream bool) []byte {
+	return convertOpenAIResponsesRequestToClaude(modelName, inputRawJSON, stream, false)
+}
+
+// ConvertOpenAIResponsesRequestToClaudeWithCompat preserves reasoning items
+// whose encrypted content is empty for configured compatibility endpoints.
+func ConvertOpenAIResponsesRequestToClaudeWithCompat(modelName string, inputRawJSON []byte, stream bool) []byte {
+	return convertOpenAIResponsesRequestToClaude(modelName, inputRawJSON, stream, true)
+}
+
+func convertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte, stream, preserveEmptyThinkingBlocks bool) []byte {
 	rawJSON := inputRawJSON
 
 	if account == "" {
@@ -370,7 +380,7 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 				}
 
 			case "reasoning":
-				if thinkingPart := convertResponsesReasoningToClaudeThinking(item); len(thinkingPart) > 0 {
+				if thinkingPart := convertResponsesReasoningToClaudeThinking(item, preserveEmptyThinkingBlocks); len(thinkingPart) > 0 {
 					pendingReasoningParts = append(pendingReasoningParts, thinkingPart)
 				}
 
@@ -484,10 +494,15 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 	return out
 }
 
-func convertResponsesReasoningToClaudeThinking(item gjson.Result) []byte {
-	signature, ok := sigcompat.CompatibleSignatureForProvider(sigcompat.SignatureProviderClaude, item.Get("encrypted_content").String())
+func convertResponsesReasoningToClaudeThinking(item gjson.Result, preserveEmptyThinkingBlocks ...bool) []byte {
+	encrypted := item.Get("encrypted_content").String()
+	preserveEmpty := len(preserveEmptyThinkingBlocks) > 0 && preserveEmptyThinkingBlocks[0]
+	signature, ok := sigcompat.CompatibleSignatureForProvider(sigcompat.SignatureProviderClaude, encrypted)
 	if !ok {
-		return nil
+		if !preserveEmpty {
+			return nil
+		}
+		signature = encrypted
 	}
 
 	thinkingText := responsesReasoningSummaryText(item)

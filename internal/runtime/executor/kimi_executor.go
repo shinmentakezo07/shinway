@@ -85,8 +85,21 @@ func (e *KimiExecutor) HttpRequest(ctx context.Context, auth *shinwayauth.Auth, 
 func (e *KimiExecutor) Execute(ctx context.Context, auth *shinwayauth.Auth, req shinwayexecutor.Request, opts shinwayexecutor.Options) (resp shinwayexecutor.Response, err error) {
 	from := opts.SourceFormat
 	if from.String() == "claude" {
-		auth.Attributes["base_url"] = kimiauth.KimiAPIBaseURL
-		return e.ClaudeExecutor.Execute(ctx, auth, req, opts)
+		preparedAuth := auth.Clone()
+		if preparedAuth.Attributes == nil {
+			preparedAuth.Attributes = make(map[string]string)
+		}
+		preparedAuth.Attributes["base_url"] = kimiauth.KimiAPIBaseURL
+		preparedReq, replayScope := prepareKimiThinkingReplayRequest(ctx, req, opts)
+		claudeResp, errExecute := e.ClaudeExecutor.Execute(ctx, preparedAuth, preparedReq, opts)
+		if errExecute != nil {
+			if replayScope.replayApplied && shouldClearKimiThinkingReplayAfterError(errExecute) {
+				clearKimiThinkingReplayContent(ctx, replayScope)
+			}
+			return claudeResp, errExecute
+		}
+		cacheKimiThinkingReplayResponse(ctx, replayScope, claudeResp.Payload)
+		return claudeResp, nil
 	}
 	responseFormat := shinwayexecutor.ResponseFormatOrSource(opts)
 
@@ -195,8 +208,20 @@ func (e *KimiExecutor) Execute(ctx context.Context, auth *shinwayauth.Auth, req 
 func (e *KimiExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Auth, req shinwayexecutor.Request, opts shinwayexecutor.Options) (_ *shinwayexecutor.StreamResult, err error) {
 	from := opts.SourceFormat
 	if from.String() == "claude" {
-		auth.Attributes["base_url"] = kimiauth.KimiAPIBaseURL
-		return e.ClaudeExecutor.ExecuteStream(ctx, auth, req, opts)
+		preparedAuth := auth.Clone()
+		if preparedAuth.Attributes == nil {
+			preparedAuth.Attributes = make(map[string]string)
+		}
+		preparedAuth.Attributes["base_url"] = kimiauth.KimiAPIBaseURL
+		preparedReq, replayScope := prepareKimiThinkingReplayRequest(ctx, req, opts)
+		claudeResult, errExecute := e.ClaudeExecutor.ExecuteStream(ctx, preparedAuth, preparedReq, opts)
+		if errExecute != nil {
+			if replayScope.replayApplied && shouldClearKimiThinkingReplayAfterError(errExecute) {
+				clearKimiThinkingReplayContent(ctx, replayScope)
+			}
+			return nil, errExecute
+		}
+		return wrapKimiThinkingReplayStream(ctx, claudeResult, replayScope), nil
 	}
 	responseFormat := shinwayexecutor.ResponseFormatOrSource(opts)
 
@@ -336,8 +361,12 @@ func (e *KimiExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Auth
 
 // CountTokens estimates token count for Kimi requests.
 func (e *KimiExecutor) CountTokens(ctx context.Context, auth *shinwayauth.Auth, req shinwayexecutor.Request, opts shinwayexecutor.Options) (shinwayexecutor.Response, error) {
-	auth.Attributes["base_url"] = kimiauth.KimiAPIBaseURL
-	return e.ClaudeExecutor.countTokensUpstream(ctx, auth, req, opts)
+	preparedAuth := auth.Clone()
+	if preparedAuth.Attributes == nil {
+		preparedAuth.Attributes = make(map[string]string)
+	}
+	preparedAuth.Attributes["base_url"] = kimiauth.KimiAPIBaseURL
+	return e.ClaudeExecutor.countTokensUpstream(ctx, preparedAuth, req, opts)
 }
 
 func normalizeKimiToolMessageLinks(body []byte) ([]byte, error) {

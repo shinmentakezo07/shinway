@@ -164,6 +164,16 @@ func IsUserDefinedModel(modelInfo *registry.ModelInfo) bool {
 //	// Without suffix - uses body config
 //	result, err := thinking.ApplyThinking(body, "gemini-2.5-pro", "gemini", "gemini", "gemini")
 func ApplyThinking(body []byte, model string, fromFormat string, toFormat string, providerKey string) ([]byte, error) {
+	return applyThinkingWithModelInfo(body, model, fromFormat, toFormat, providerKey, nil)
+}
+
+// ApplyThinkingWithModelInfo applies thinking using the exact configured model
+// capability snapshot selected for an API-key execution attempt.
+func ApplyThinkingWithModelInfo(body []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo) ([]byte, error) {
+	return applyThinkingWithModelInfo(body, model, fromFormat, toFormat, providerKey, modelInfo)
+}
+
+func applyThinkingWithModelInfo(body []byte, model string, fromFormat string, toFormat string, providerKey string, resolvedModelInfo *registry.ModelInfo) ([]byte, error) {
 	providerFormat := strings.ToLower(strings.TrimSpace(toFormat))
 	providerKey = strings.ToLower(strings.TrimSpace(providerKey))
 	if providerKey == "" {
@@ -187,7 +197,10 @@ func ApplyThinking(body []byte, model string, fromFormat string, toFormat string
 	suffixResult := ParseSuffix(model)
 	baseModel := suffixResult.ModelName
 	// Use provider-specific lookup to handle capability differences across providers.
-	modelInfo := registry.LookupModelInfo(baseModel, providerKey)
+	modelInfo := resolvedModelInfo
+	if modelInfo == nil {
+		modelInfo = registry.LookupModelInfo(baseModel, providerKey)
+	}
 
 	// 3. Model capability check
 	// Unknown models are treated as user-defined so thinking config can still be applied.

@@ -21,7 +21,7 @@ func (e *CodexExecutor) CountTokens(ctx context.Context, auth *shinwayauth.Auth,
 	from := opts.SourceFormat
 	responseFormat := shinwayexecutor.ResponseFormatOrSource(opts)
 	to := sdktranslator.FromString("codex")
-	body := sdktranslator.TranslateRequest(from, to, baseModel, req.Payload, false)
+	body := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, false, helps.APIKeyModelIsCompat(req))
 
 	body, err := thinking.ApplyThinking(body, req.Model, from.String(), to.String(), e.Identifier())
 	if err != nil {

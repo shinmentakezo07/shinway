@@ -737,7 +737,7 @@ func TestCodexAlphaSearchSanitizesResponsesOnlyFields(t *testing.T) {
 	}
 }
 
-func TestCodexAlphaSearchRequiresOAuthCredential(t *testing.T) {
+func TestCodexAlphaSearchCredentialPolicy(t *testing.T) {
 	newServer := func(t *testing.T, credentials ...*auth.Auth) (*Server, *codexSearchCaptureExecutor) {
 		t.Helper()
 		server := newTestServer(t)
@@ -751,12 +751,16 @@ func TestCodexAlphaSearchRequiresOAuthCredential(t *testing.T) {
 		}
 		return server, executor
 	}
-	apiKeyCredential := func() *auth.Auth {
+	apiKeyCredential := func(alphaSearch bool) *auth.Auth {
+		attributes := map[string]string{auth.AttributeAPIKey: "codex-key", "base_url": "https://codex.example/v1"}
+		if alphaSearch {
+			attributes["codex_alpha_search"] = "true"
+		}
 		return &auth.Auth{
 			ID:         "codex-api-key",
 			Provider:   "codex",
 			Status:     auth.StatusActive,
-			Attributes: map[string]string{auth.AttributeAPIKey: "codex-key"},
+			Attributes: attributes,
 		}
 	}
 	oauthCredential := func() *auth.Auth {
@@ -769,7 +773,7 @@ func TestCodexAlphaSearchRequiresOAuthCredential(t *testing.T) {
 	}
 
 	t.Run("mixed credentials", func(t *testing.T) {
-		server, executor := newServer(t, apiKeyCredential(), oauthCredential())
+		server, executor := newServer(t, apiKeyCredential(false), oauthCredential())
 		req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(`{"query":"GPT-5.6"}`))
 		req.Header.Set("Authorization", "Bearer test-key")
 		rr := httptest.NewRecorder()
@@ -783,8 +787,8 @@ func TestCodexAlphaSearchRequiresOAuthCredential(t *testing.T) {
 		}
 	})
 
-	t.Run("API key only", func(t *testing.T) {
-		server, executor := newServer(t, apiKeyCredential())
+	t.Run("API key without alpha search", func(t *testing.T) {
+		server, executor := newServer(t, apiKeyCredential(false))
 		req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(`{"query":"GPT-5.6"}`))
 		req.Header.Set("Authorization", "Bearer test-key")
 		rr := httptest.NewRecorder()
@@ -795,6 +799,40 @@ func TestCodexAlphaSearchRequiresOAuthCredential(t *testing.T) {
 		}
 		if len(executor.authIDs) != 0 {
 			t.Fatalf("selected auth IDs = %v, want none", executor.authIDs)
+		}
+	})
+
+	t.Run("enabled API key resolves model and base URL", func(t *testing.T) {
+		server := newTestServer(t)
+		server.handlers.AuthManager.SetSelector(&codexSearchAPIKeyFirstSelector{})
+		executor := &codexSearchCaptureExecutor{}
+		server.handlers.AuthManager.RegisterExecutor(executor)
+		server.handlers.AuthManager.SetConfig(&proxyconfig.Config{CodexKey: []proxyconfig.CodexKey{{
+			APIKey: "codex-key", BaseURL: "https://codex.example/v1", AlphaSearch: true,
+			Models: []proxyconfig.CodexModel{{Name: "gpt-5-upstream", Alias: "public-model"}},
+		}}})
+		if _, errRegister := server.handlers.AuthManager.Register(context.Background(), apiKeyCredential(true)); errRegister != nil {
+			t.Fatalf("register Codex API key: %v", errRegister)
+		}
+		registry.GetGlobalRegistry().RegisterClient("codex-api-key", "codex", []*registry.ModelInfo{{ID: "public-model"}})
+		t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient("codex-api-key") })
+		req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(`{"model":"public-model","query":"GPT-5.6"}`))
+		req.Header.Set("Authorization", "Bearer test-key")
+		rr := httptest.NewRecorder()
+		server.engine.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+		}
+		if got := executor.request.URL.String(); got != "https://codex.example/v1/alpha/search" {
+			t.Fatalf("upstream URL = %q", got)
+		}
+		var body map[string]json.RawMessage
+		if err := json.Unmarshal(executor.body, &body); err != nil {
+			t.Fatalf("unmarshal upstream body: %v", err)
+		}
+		if got := string(body["model"]); got != `"gpt-5-upstream"` {
+			t.Fatalf("upstream model = %s, want %q", got, "gpt-5-upstream")
 		}
 	})
 }

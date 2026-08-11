@@ -250,6 +250,33 @@ func sanitizeCodexAlphaSearchBody(body []byte) []byte {
 	return sanitizedBody
 }
 
+// rewriteCodexAlphaSearchModel replaces the top-level model with the selected
+// credential's resolved upstream model before forwarding an API-key request.
+func rewriteCodexAlphaSearchModel(body []byte, upstreamModel string) []byte {
+	upstreamModel = strings.TrimSpace(upstreamModel)
+	if upstreamModel == "" {
+		return body
+	}
+
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(body, &payload); err != nil || payload == nil {
+		return body
+	}
+	if _, exists := payload["model"]; !exists {
+		return body
+	}
+	modelJSON, err := json.Marshal(upstreamModel)
+	if err != nil || string(payload["model"]) == string(modelJSON) {
+		return body
+	}
+	payload["model"] = modelJSON
+	rewritten, err := json.Marshal(payload)
+	if err != nil {
+		return body
+	}
+	return rewritten
+}
+
 func homeSelectionAttemptContext(ctx context.Context, selection *auth.HomeDispatchSelection) (context.Context, func(), error) {
 	if selection == nil {
 		return nil, func() {}, errors.New("Home dispatch selection is nil")
@@ -294,12 +321,12 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 	var selection *auth.HomeDispatchSelection
 	var selected *auth.Auth
 	if s.handlers.AuthManager.HomeEnabled() {
-		selection, err = s.handlers.AuthManager.SelectHomeAuthByKind(ctx, "codex", selectionModel, auth.AuthKindOAuth, selectionOpts)
+		selection, err = s.handlers.AuthManager.SelectHomeAuthWithCredentialPolicy(ctx, "codex", selectionModel, auth.CredentialPolicyCodexAlphaSearchV1, selectionOpts)
 		if selection != nil {
 			selected = selection.CloneAuth()
 		}
 	} else {
-		selected, err = s.handlers.AuthManager.SelectAuthByKind(ctx, "codex", selectionModel, auth.AuthKindOAuth, selectionOpts)
+		selected, err = s.handlers.AuthManager.SelectAuthWithCredentialPolicy(ctx, "codex", selectionModel, auth.CredentialPolicyCodexAlphaSearchV1, selectionOpts)
 	}
 	if err != nil {
 		status := http.StatusServiceUnavailable
@@ -333,49 +360,48 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 	}
 	logging.SetGinCPATraceID(c, selected.EnsureIndex())
 
-	headers := make(http.Header)
-	headers.Set("Content-Type", "application/json")
-	headers.Set("Accept", "application/json")
-	headers.Set("Originator", "codex_cli_rs")
+	baseHeaders := make(http.Header)
+	baseHeaders.Set("Content-Type", "application/json")
+	baseHeaders.Set("Accept", "application/json")
+	baseHeaders.Set("Originator", "codex_cli_rs")
 	for _, name := range []string{"Version", "User-Agent", "Session_id", "X-Client-Request-Id"} {
 		if value := strings.TrimSpace(c.GetHeader(name)); value != "" {
-			headers.Set(name, value)
+			baseHeaders.Set(name, value)
 		}
 	}
-	if accountID, ok := selected.Metadata["account_id"].(string); ok && strings.TrimSpace(accountID) != "" {
-		headers.Set("Chatgpt-Account-Id", accountID)
+	errMissingBaseURL := errors.New("Codex Alpha Search API key base URL unavailable")
+	routeModel := strings.TrimSpace(selectionModel)
+	if routeModel == "" {
+		routeModel = strings.TrimSpace(routing.Model)
 	}
-
-	const upstreamURL = "https://chatgpt.com/backend-api/codex/alpha/search"
-	req, err := s.handlers.AuthManager.NewHttpRequest(
-		ctx, selected, http.MethodPost, upstreamURL, upstreamRequestBody, headers,
-	)
-	if err != nil {
-		if selection != nil {
-			selection.End("request_build_failed")
+	performRequest := func(current *auth.Auth) (*http.Response, error) {
+		headers := baseHeaders.Clone()
+		if accountID, ok := current.Metadata["account_id"].(string); ok && strings.TrimSpace(accountID) != "" {
+			headers.Set("Chatgpt-Account-Id", accountID)
 		}
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
+		upstreamURL := "https://chatgpt.com/backend-api/codex/alpha/search"
+		requestBody := upstreamRequestBody
+		if current.AuthKind() == auth.AuthKindAPIKey {
+			baseURL := ""
+			if current.Attributes != nil {
+				baseURL = strings.TrimSpace(current.Attributes["base_url"])
+			}
+			if baseURL == "" {
+				return nil, errMissingBaseURL
+			}
+			upstreamURL = strings.TrimRight(baseURL, "/") + "/alpha/search"
+			if upstreamModel := s.handlers.AuthManager.ResolveExecutionModel(current, routeModel); upstreamModel != "" {
+				requestBody = rewriteCodexAlphaSearchModel(upstreamRequestBody, upstreamModel)
+			}
+		}
+		req, errRequest := s.handlers.AuthManager.NewHttpRequest(ctx, current, http.MethodPost, upstreamURL, requestBody, headers)
+		if errRequest != nil {
+			return nil, errRequest
+		}
+		authType, authValue := current.AccountInfo()
+		helps.RecordAPIRequest(ctx, s.cfg, helps.UpstreamRequestLog{URL: upstreamURL, Method: http.MethodPost, Headers: req.Header.Clone(), Body: requestBody, Provider: "codex", AuthID: current.ID, AuthLabel: current.Label, AuthType: authType, AuthValue: authValue})
+		return s.handlers.AuthManager.HttpRequest(ctx, current, req)
 	}
-
-	var authID, authLabel, authType, authValue string
-	if selected != nil {
-		authID = selected.ID
-		authLabel = selected.Label
-		authType, authValue = selected.AccountInfo()
-	}
-	helpHeaders := req.Header.Clone()
-	helps.RecordAPIRequest(ctx, s.cfg, helps.UpstreamRequestLog{
-		URL:       upstreamURL,
-		Method:    http.MethodPost,
-		Headers:   helpHeaders,
-		Body:      upstreamRequestBody,
-		Provider:  "codex",
-		AuthID:    authID,
-		AuthLabel: authLabel,
-		AuthType:  authType,
-		AuthValue: authValue,
-	})
 
 	if errCtx := ctx.Err(); errCtx != nil {
 		if selection != nil {
@@ -384,15 +410,20 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 		c.JSON(http.StatusRequestTimeout, gin.H{"error": errCtx.Error()})
 		return
 	}
-	resp, err := s.handlers.AuthManager.HttpRequest(ctx, selected, req)
+	resp, err := performRequest(selected)
 	if err != nil {
 		if selection != nil {
 			selection.End("request_failed")
 		}
+		status := http.StatusBadGateway
+		if errors.Is(err, errMissingBaseURL) {
+			status = http.StatusServiceUnavailable
+		}
 		helps.RecordAPIResponseError(ctx, s.cfg, err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
+
 	closeResponseBody := func() error {
 		errClose := resp.Body.Close()
 		if errClose != nil {

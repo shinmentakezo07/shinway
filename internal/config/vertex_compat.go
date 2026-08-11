@@ -1,6 +1,10 @@
 package config
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/shinmentakezo07/shinway/v7/internal/registry"
+)
 
 // VertexCompatKey represents the configuration for Vertex AI-compatible API keys.
 // This supports third-party services that use Vertex AI-style endpoint paths
@@ -58,14 +62,28 @@ type VertexCompatModel struct {
 	// DisplayName is the optional human-readable name shown in model catalogs.
 	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
 
+	// MaxContextLength overrides the context window advertised to clients.
+	MaxContextLength int `yaml:"max-context-length,omitempty" json:"max-context-length,omitempty"`
+
 	// ForceMapping rewrites upstream response model fields back to Alias.
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
+
+	// Thinking configures the reasoning capability for this model.
+	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
+
+	// IsCompat enables compatibility handling for this configured model.
+	IsCompat bool `yaml:"is-compat,omitempty" json:"is-compat,omitempty"`
 }
 
-func (m VertexCompatModel) GetName() string        { return m.Name }
-func (m VertexCompatModel) GetAlias() string       { return m.Alias }
-func (m VertexCompatModel) GetDisplayName() string { return m.DisplayName }
-func (m VertexCompatModel) GetForceMapping() bool  { return m.ForceMapping }
+func (m VertexCompatModel) GetName() string          { return m.Name }
+func (m VertexCompatModel) GetAlias() string         { return m.Alias }
+func (m VertexCompatModel) GetDisplayName() string   { return m.DisplayName }
+func (m VertexCompatModel) GetForceMapping() bool    { return m.ForceMapping }
+func (m VertexCompatModel) GetMaxContextLength() int { return m.MaxContextLength }
+func (m VertexCompatModel) GetThinking() *registry.ThinkingSupport {
+	return m.Thinking
+}
+func (m VertexCompatModel) GetIsCompat() bool { return m.IsCompat }
 
 // SanitizeVertexCompatKeys deduplicates and normalizes Vertex-compatible API key credentials.
 func (cfg *Config) SanitizeVertexCompatKeys() {

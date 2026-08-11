@@ -125,8 +125,9 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *shinwayauth.Au
 		originalPayloadSource = opts.OriginalRequest
 	}
 	originalPayload := originalPayloadSource
-	originalTranslated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, opts.Stream)
-	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, opts.Stream)
+	isCompat := helps.APIKeyModelIsCompat(req)
+	originalTranslated := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, opts.Stream, isCompat)
+	translated := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, opts.Stream, isCompat)
 	if e.translateHook != nil {
 		translated = e.translateHook(translated, req.Model)
 		// The hook owns thinking configuration for this provider (e.g. NVIDIA
@@ -134,7 +135,7 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *shinwayauth.Au
 		// pass below, which would otherwise select the OpenAI applier (toFormat is
 		// "openai" here) and re-apply — a double invocation with the wrong applier.
 	} else {
-		translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
+		translated, err = helps.ApplyRequestThinking(translated, req, opts, from.String(), to.String(), e.Identifier())
 		if err != nil {
 			return resp, err
 		}
@@ -333,14 +334,15 @@ func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *shinwaya
 		originalPayloadSource = opts.OriginalRequest
 	}
 	originalPayload := originalPayloadSource
-	originalTranslated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, true)
-	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, true)
+	isCompat := helps.APIKeyModelIsCompat(req)
+	originalTranslated := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, originalPayload, true, isCompat)
+	translated := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, true, isCompat)
 	if e.translateHook != nil {
 		translated = e.translateHook(translated, req.Model)
 		// The hook owns thinking configuration for this provider; running the
 		// generic pass again here would double-apply with the OpenAI applier.
 	} else {
-		translated, err = thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
+		translated, err = helps.ApplyRequestThinking(translated, req, opts, from.String(), to.String(), e.Identifier())
 		if err != nil {
 			return nil, err
 		}
@@ -609,11 +611,12 @@ func (e *OpenAICompatExecutor) CountTokens(ctx context.Context, auth *shinwayaut
 	from := opts.SourceFormat
 	responseFormat := shinwayexecutor.ResponseFormatOrSource(opts)
 	to := sdktranslator.FromString("openai")
-	translated := helps.TranslateRequestWithCodexMultiAgentV2(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, false)
+	isCompat := helps.APIKeyModelIsCompat(req)
+	translated := helps.TranslateRequestWithAPIKeyModelCompatibility(ctx, opts.Headers, e.cfg, from, to, baseModel, req.Payload, false, isCompat)
 
 	modelForCounting := baseModel
 
-	translated, err := thinking.ApplyThinking(translated, req.Model, from.String(), to.String(), e.Identifier())
+	translated, err := helps.ApplyRequestThinking(translated, req, opts, from.String(), to.String(), e.Identifier())
 	if err != nil {
 		return shinwayexecutor.Response{}, err
 	}

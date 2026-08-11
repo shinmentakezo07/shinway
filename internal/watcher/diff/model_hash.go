@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
+	"github.com/shinmentakezo07/shinway/v7/internal/registry"
 )
 
 // ComputeOpenAICompatModelsHash returns a stable hash for OpenAI-compat models.
@@ -21,7 +22,7 @@ func ComputeOpenAICompatModelsHash(models []config.OpenAICompatibilityModel) str
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName) + "|" + fmt.Sprintf("image=%t", model.Image))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking, fmt.Sprintf("image=%t", model.Image)))
 		}
 	})
 	return hashJoined(keys)
@@ -36,7 +37,7 @@ func ComputeVertexCompatModelsHash(models []config.VertexCompatModel) string {
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return hashJoined(keys)
@@ -51,7 +52,7 @@ func ComputeClaudeModelsHash(models []config.ClaudeModel) string {
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return hashJoined(keys)
@@ -66,7 +67,7 @@ func ComputeCodexModelsHash(models []config.CodexModel) string {
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName) + "|" + fmt.Sprintf("force-mapping=%t", model.ForceMapping))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return hashJoined(keys)
@@ -81,10 +82,23 @@ func ComputeGeminiModelsHash(models []config.GeminiModel) string {
 			if name == "" && alias == "" {
 				continue
 			}
-			out(strings.ToLower(name) + "|" + strings.ToLower(alias) + "|" + strings.TrimSpace(model.DisplayName))
+			out(modelHashKey(name, alias, model.DisplayName, model.ForceMapping, model.IsCompat, model.MaxContextLength, model.Thinking))
 		}
 	})
 	return hashJoined(keys)
+}
+
+func modelHashKey(name, alias, displayName string, forceMapping, isCompat bool, maxContextLength int, thinking *registry.ThinkingSupport, suffix ...string) string {
+	key := strings.ToLower(strings.TrimSpace(name)) + "|" + strings.ToLower(strings.TrimSpace(alias)) + "|" + strings.TrimSpace(displayName) + "|" + fmt.Sprintf("force-mapping=%t|is-compat=%t|max-context-length=%d", forceMapping, isCompat, maxContextLength) + thinkingHashSuffix(thinking)
+	if len(suffix) > 0 && suffix[0] != "" {
+		key += "|" + suffix[0]
+	}
+	return key
+}
+
+func thinkingHashSuffix(support *registry.ThinkingSupport) string {
+	data, _ := json.Marshal(support)
+	return "|thinking=" + string(data)
 }
 
 // ComputeExcludedModelsHash returns a normalized hash for excluded model lists.
@@ -105,6 +119,11 @@ func ComputeExcludedModelsHash(excluded []string) string {
 	data, _ := json.Marshal(normalized)
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
+}
+
+func modelCapabilityHashSuffix(maxContextLength int, isCompat bool, support *registry.ThinkingSupport) string {
+	data, _ := json.Marshal(support)
+	return fmt.Sprintf("|max-context-length=%d|is-compat=%t|thinking=%s", maxContextLength, isCompat, data)
 }
 
 func normalizeModelPairs(collect func(out func(key string))) []string {

@@ -14,6 +14,7 @@ type ClaudeMessagesSignatureSanitizeOptions struct {
 	DropEmptyMessages             bool
 	DropToolSignatures            bool
 	DropEmptyThinkingPlaceholders bool
+	PreserveEmptyThinkingBlocks   bool
 }
 
 type SignatureSanitizeReport struct {
@@ -41,13 +42,19 @@ func SanitizeClaudeMessagesSignaturesForModel(payload []byte, targetModel string
 // provider-native E-form, valid Claude CAIS signatures are kept,
 // incompatible thinking blocks are dropped, and tool_use blocks keep only their
 // tool-call payload.
-func SanitizeClaudeMessagesForClaudeUpstream(payload []byte, targetModel string) ([]byte, SignatureSanitizeReport) {
+//
+// preserveEmptyThinkingBlocks enables compatibility handling for configured
+// API-key models (is-compat): every thinking block is kept byte-for-byte so
+// provider-signed history restored by thinking replay is never stripped.
+func SanitizeClaudeMessagesForClaudeUpstream(payload []byte, targetModel string, preserveEmptyThinkingBlocks ...bool) ([]byte, SignatureSanitizeReport) {
+	preserveEmpty := len(preserveEmptyThinkingBlocks) > 0 && preserveEmptyThinkingBlocks[0]
 	return SanitizeClaudeMessagesSignaturesForTarget(payload, ClaudeMessagesSignatureSanitizeOptions{
 		TargetProvider:                SignatureProviderClaude,
 		TargetModel:                   targetModel,
 		DropEmptyMessages:             true,
 		DropToolSignatures:            true,
-		DropEmptyThinkingPlaceholders: true,
+		DropEmptyThinkingPlaceholders: !preserveEmpty,
+		PreserveEmptyThinkingBlocks:   preserveEmpty,
 	})
 }
 
@@ -125,6 +132,11 @@ func SanitizeClaudeMessagesSignaturesForTarget(payload []byte, opts ClaudeMessag
 			}
 
 			rawSignature := part.Get("signature").String()
+			if opts.PreserveEmptyThinkingBlocks {
+				report.Preserved++
+				keptParts = append(keptParts, part.Raw)
+				continue
+			}
 			decision := DecideSignatureCompatibilityForModel(targetProvider, opts.TargetModel, rawSignature, SignatureBlockKindClaudeThinking)
 			decision.Reason = fmt.Sprintf("messages[%d].content[%d]: %s", i, j, decision.Reason)
 			report.Decisions = append(report.Decisions, decision)

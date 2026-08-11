@@ -50,9 +50,11 @@ func isBuiltInSelector(selector Selector) bool {
 }
 
 type requiredAuthKindContextKey struct{}
+type credentialPolicyContextKey struct{}
 
 type authSelectionEligibility struct {
 	requiredKind     string
+	credentialPolicy string
 	disallowFreeAuth bool
 }
 
@@ -60,10 +62,15 @@ func withRequiredAuthKind(ctx context.Context, requiredKind string) context.Cont
 	return context.WithValue(ctx, requiredAuthKindContextKey{}, requiredKind)
 }
 
+func withCredentialPolicy(ctx context.Context, policy string) context.Context {
+	return context.WithValue(ctx, credentialPolicyContextKey{}, policy)
+}
+
 func authSelectionEligibilityForRequest(ctx context.Context, opts shinwayexecutor.Options) authSelectionEligibility {
 	eligibility := authSelectionEligibility{disallowFreeAuth: disallowFreeAuthFromMetadata(opts.Metadata)}
 	if ctx != nil {
 		eligibility.requiredKind, _ = ctx.Value(requiredAuthKindContextKey{}).(string)
+		eligibility.credentialPolicy, _ = ctx.Value(credentialPolicyContextKey{}).(string)
 	}
 	return eligibility
 }
@@ -73,6 +80,9 @@ func (e authSelectionEligibility) allows(auth *Auth) bool {
 		return false
 	}
 	if e.requiredKind != "" && auth.AuthKind() != e.requiredKind {
+		return false
+	}
+	if e.credentialPolicy != "" && !credentialPolicyAllows(e.credentialPolicy, auth) {
 		return false
 	}
 	return !e.disallowFreeAuth || !isFreeCodexAuth(auth)
@@ -1068,6 +1078,25 @@ func (m *Manager) SelectAuthByKind(ctx context.Context, provider, model, require
 	return selected, nil
 }
 
+// SelectAuthWithCredentialPolicy selects one local credential allowed by a fixed policy.
+func (m *Manager) SelectAuthWithCredentialPolicy(ctx context.Context, provider, model, policy string, opts shinwayexecutor.Options) (*Auth, error) {
+	if m != nil && m.HomeEnabled() {
+		return nil, &Error{Code: "home_unavailable", Message: "legacy auth selection is unavailable while Home is enabled", HTTPStatus: http.StatusServiceUnavailable}
+	}
+	policy = normalizeCredentialPolicy(policy)
+	if policy == "" {
+		return nil, &Error{Code: "invalid_credential_policy", Message: "credential policy is invalid", HTTPStatus: http.StatusBadRequest}
+	}
+	selected, _, errPick := m.pickNextLegacy(withCredentialPolicy(ctx, policy), provider, model, opts, nil)
+	if errPick != nil {
+		return nil, errPick
+	}
+	if selected == nil || !credentialPolicyAllows(policy, selected) {
+		return nil, &Error{Code: "auth_not_found", Message: "selector returned no eligible auth"}
+	}
+	return selected, nil
+}
+
 // SelectHomeAuthByKind selects a Home dispatch while retaining its execution scope.
 func (m *Manager) SelectHomeAuthByKind(ctx context.Context, provider string, model string, requiredKind string, opts shinwayexecutor.Options) (*HomeDispatchSelection, error) {
 	requiredKind = normalizeAuthKind(requiredKind)
@@ -1097,6 +1126,50 @@ func (m *Manager) SelectHomeAuthByKind(ctx context.Context, provider string, mod
 			authID = strings.TrimSpace(selection.Auth.ID)
 		}
 		reason := "auth_kind_mismatch"
+		if !providerMatches {
+			reason = "provider_mismatch"
+		}
+		if errEnd := m.endHomeSelectionBeforeRedispatch(ctx, selection, reason); errEnd != nil {
+			return nil, errEnd
+		}
+		if authID == "" {
+			return nil, &Error{Code: "auth_not_found", Message: "selected auth has no ID"}
+		}
+		if _, alreadyTried := tried[authID]; alreadyTried {
+			return nil, &Error{Code: "auth_not_found", Message: "selector repeatedly returned an ineligible auth"}
+		}
+		tried[authID] = struct{}{}
+		homeAuthCount++
+	}
+}
+
+// SelectHomeAuthWithCredentialPolicy selects a policy-constrained Home dispatch while retaining its execution scope.
+func (m *Manager) SelectHomeAuthWithCredentialPolicy(ctx context.Context, provider, model, policy string, opts shinwayexecutor.Options) (*HomeDispatchSelection, error) {
+	policy = normalizeCredentialPolicy(policy)
+	if policy == "" {
+		return nil, &Error{Code: "invalid_credential_policy", Message: "credential policy is invalid", HTTPStatus: http.StatusBadRequest}
+	}
+	if m == nil || !m.HomeEnabled() {
+		return nil, &Error{Code: "home_unavailable", Message: "home control center unavailable", HTTPStatus: http.StatusServiceUnavailable}
+	}
+
+	homeAuthCount := homeAuthCountFromMetadata(opts.Metadata)
+	tried := make(map[string]struct{})
+	for {
+		selectionOpts := withHomeAuthCount(opts, homeAuthCount)
+		selection, errSelection := m.pickHomeDispatchSelection(withCredentialPolicy(ctx, policy), model, selectionOpts)
+		if errSelection != nil {
+			return nil, errSelection
+		}
+		providerMatches := strings.TrimSpace(provider) == "" || strings.EqualFold(strings.TrimSpace(selection.Provider), strings.TrimSpace(provider))
+		if providerMatches && credentialPolicyAllows(policy, selection.Auth) {
+			return selection, nil
+		}
+		authID := ""
+		if selection.Auth != nil {
+			authID = strings.TrimSpace(selection.Auth.ID)
+		}
+		reason := "credential_policy_mismatch"
 		if !providerMatches {
 			reason = "provider_mismatch"
 		}

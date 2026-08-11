@@ -55,7 +55,7 @@ func (m *Manager) executeHome(ctx context.Context, providers []string, req shinw
 			execCtx = context.WithValue(execCtx, roundTripperContextKey{}, rt)
 			execCtx = context.WithValue(execCtx, "shinway.roundtripper", rt)
 		}
-		models, pooled, aliasResult := m.preparedExecutionModelsWithAlias(auth, routeModel)
+		models, pooled, aliasResult, routing := m.preparedExecutionModelsWithAliasAndRouting(auth, routeModel)
 		if aliasResult.ForceMapping && responseAlias != "" {
 			aliasResult.OriginalAlias = responseAlias
 		}
@@ -101,6 +101,9 @@ func (m *Manager) executeHome(ctx context.Context, providers []string, req shinw
 				releaseAttempt()
 				selection.End("attempt_canceled")
 				return shinwayexecutor.Response{}, errCtx
+			}
+			if !restoreExecutionModel {
+				execReq = attachResolvedAPIKeyModelInfo(routing, execReq, preparedAuth, routeModel, upstreamModel)
 			}
 			var response shinwayexecutor.Response
 			var errExecute error

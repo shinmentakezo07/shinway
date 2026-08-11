@@ -109,19 +109,7 @@ func pickRequestJSON(originalRequestRawJSON, requestRawJSON []byte) []byte {
 
 func applyResponsesFunctionCallNamespaceFields(item []byte, requestRawJSON []byte, qualifiedName string, itemPath string) []byte {
 	name, namespace := splitResponsesQualifiedFunctionCallFromRequest(requestRawJSON, qualifiedName)
-	namePath := "name"
-	namespacePath := "namespace"
-	if itemPath != "" {
-		namePath = itemPath + ".name"
-		namespacePath = itemPath + ".namespace"
-	}
-	item, _ = sjson.SetBytes(item, namePath, name)
-	if namespace != "" {
-		item, _ = sjson.SetBytes(item, namespacePath, namespace)
-	} else {
-		item, _ = sjson.DeleteBytes(item, namespacePath)
-	}
-	return item
+	return translatorcommon.SetResponsesToolCallIdentity(item, name, namespace, itemPath)
 }
 
 func emitEvent(event string, payload []byte) []byte {
@@ -275,6 +263,13 @@ func ConvertClaudeResponseToOpenAIResponses(ctx context.Context, modelName strin
 			created, _ = sjson.SetBytes(created, "sequence_number", nextSeq())
 			created, _ = sjson.SetBytes(created, "response.id", st.ResponseID)
 			created, _ = sjson.SetBytes(created, "response.created_at", st.CreatedAt)
+			requestModelName := translatorcommon.RequestModelName(originalRequestRawJSON, requestRawJSON)
+			if requestModelName == "" {
+				requestModelName = modelName
+			}
+			if requestModelName != "" {
+				created, _ = sjson.SetBytes(created, "response.model", requestModelName)
+			}
 			out = append(out, emitEvent("response.created", created))
 			// response.in_progress
 			inprog := []byte(`{"type":"response.in_progress","sequence_number":0,"response":{"id":"","object":"response","created_at":0,"status":"in_progress"}}`)
