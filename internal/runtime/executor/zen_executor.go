@@ -170,11 +170,16 @@ func normaliseDeepSeekReasoningContent(body []byte) []byte {
 		}
 		role := strings.TrimSpace(msg.Get("role").String())
 
-		// A user or system message starts a new turn. Reasoning observed in an
-		// earlier turn must not leak into tool-call messages of later turns, so
-		// the carried fallback state is reset at the boundary. Tool messages
-		// stay within the same turn and keep the fallback available.
-		if role != "assistant" && role != "tool" {
+		// A user message starts a new turn. Reasoning observed in an earlier
+		// turn must not leak into tool-call messages of later turns, so the
+		// carried fallback state is reset only at user boundaries. A system or
+		// developer message is an in-turn instruction, not a new turn: OpenAI
+		// tool loops occasionally re-inject a system message between a tool
+		// result and the follow-up assistant tool_calls message, and the
+		// follow-up is still the same tool-call turn, so the fallback must
+		// survive it. Tool messages stay within the same turn and keep the
+		// fallback available.
+		if role == "user" {
 			latestReasoning = ""
 			hasLatestReasoning = false
 			continue

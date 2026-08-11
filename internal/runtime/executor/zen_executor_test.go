@@ -115,6 +115,29 @@ func TestZenExecutorTranslateHookDoesNotLeakReasoningAcrossUserBoundary(t *testi
 	}
 }
 
+func TestZenExecutorTranslateHookKeepsReasoningAcrossMidTurnSystemMessage(t *testing.T) {
+	executor := NewZenExecutor(&config.Config{})
+
+	translated := executor.translateHook([]byte(`{
+  "model":"deepseek-v4-flash-free",
+  "reasoning_effort":"high",
+  "messages":[
+    {"role":"user","content":"Use the tool."},
+    {"role":"assistant","content":"","reasoning_content":"R1","tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},
+    {"role":"tool","tool_call_id":"call_1","content":"result"},
+    {"role":"system","content":"Reminder: finish the task."},
+    {"role":"assistant","tool_calls":[{"id":"call_2","type":"function","function":{"name":"edit","arguments":"{}"}}]}
+  ]
+}`), "deepseek-v4-flash-free")
+
+	// The system message is an in-turn instruction, not a turn boundary: the
+	// follow-up assistant tool_calls message is still the same tool-call turn,
+	// so it keeps the reasoning carried from the earlier assistant message.
+	if got := gjson.GetBytes(translated, "messages.4.reasoning_content").String(); got != "R1" {
+		t.Fatalf("tool-call reasoning_content after mid-turn system = %q, want R1 (same turn)", got)
+	}
+}
+
 func TestZenExecutorTranslateHookForwardsZenReasoningLevels(t *testing.T) {
 	executor := NewZenExecutor(&config.Config{})
 
