@@ -42,6 +42,7 @@ const (
 	homeReconnectFailoverThreshold            = 3
 	homeRedisOperationTimeout                 = 3 * time.Second
 	homePluginSyncOperationTimeout            = 2 * time.Minute
+	homePluginSyncCancellationGrace           = 250 * time.Millisecond
 	homeSubscriptionReceiveTimeout            = 3 * time.Second
 	credentialConcurrencyNodeHeartbeatTimeout = 20 * time.Second
 	redisChannelCluster                       = "cluster"
@@ -1509,16 +1510,34 @@ func processPluginSyncCommand(ctx context.Context, options *redis.Options, comma
 	if pluginSyncClient == nil {
 		return ErrNotConnected
 	}
-	errProcess := pluginSyncClient.Process(ctx, command)
-	errClose := pluginSyncClient.Close()
+	defer pluginSyncClient.Close()
+
+	processDone := make(chan error, 1)
+	go func() {
+		processDone <- pluginSyncClient.Process(ctx, command)
+	}()
+
+	var errProcess error
+	select {
+	case errProcess = <-processDone:
+	case <-ctx.Done():
+		// The per-connection cancel watcher interrupts the blocked read with a
+		// deadline. Closing the client is a deterministic backstop so a delayed
+		// watcher cannot stall cancellation for the full plugin sync read timeout.
+		_ = pluginSyncClient.Close()
+		grace := time.NewTimer(homePluginSyncCancellationGrace)
+		select {
+		case errProcess = <-processDone:
+			grace.Stop()
+		case <-grace.C:
+		}
+	}
+
 	if errContext := ctx.Err(); errContext != nil {
 		return errContext
 	}
 	if errProcess != nil {
 		return errProcess
-	}
-	if errClose != nil {
-		return fmt.Errorf("close plugin sync command client: %w", errClose)
 	}
 	return nil
 }
