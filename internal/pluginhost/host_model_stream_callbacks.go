@@ -25,19 +25,27 @@ func (h *Host) callHostModelExecuteStream(ctx context.Context, request []byte) (
 	if callbackCtx == nil {
 		callbackCtx = context.Background()
 	}
-	// Detach request cancellation while preserving callback values; callback cleanup owns the model stream lifetime.
+	// Detach request cancellation while preserving callback values. Once the
+	// stream is registered the bridge entry owns cancel and releases it via
+	// close; until then the deferred cancel guards every failure path so no
+	// context can leak.
 	streamCtx, cancel := context.WithCancel(context.WithoutCancel(callbackCtx))
+	transferred := false
+	defer func() {
+		if !transferred {
+			cancel()
+		}
+	}()
 	stream, errMsg := executor.ExecuteModelStream(streamCtx, modelExecutionRequestFromPlugin(req.HostModelExecutionRequest, skipPluginID))
 	if errMsg != nil {
-		cancel()
 		return nil, modelExecutionError(errMsg)
 	}
 	streamID := ""
 	if h.modelStreams != nil {
 		streamID = h.modelStreams.open(req.HostCallbackID, stream.Chunks, cancel)
+		transferred = streamID != ""
 	}
 	if streamID == "" {
-		cancel()
 		return nil, fmt.Errorf("host model stream bridge is unavailable")
 	}
 	if req.HostCallbackID != "" {
