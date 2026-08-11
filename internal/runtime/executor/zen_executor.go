@@ -82,6 +82,7 @@ func applyZenReasoningLevel(body []byte, model string) []byte {
 		if upstream, ok := zenReasoningLevels[level]; ok {
 			updated, errSet := sjson.SetBytes(body, "reasoning_effort", upstream)
 			if errSet != nil {
+				// A failed set passes the original body through unchanged (matches openai/apply.go).
 				return body
 			}
 			return updated
@@ -96,6 +97,7 @@ func applyZenReasoningLevel(body []byte, model string) []byte {
 	if upstream, ok := zenReasoningLevels[level]; ok {
 		updated, errSet := sjson.SetBytes(body, "reasoning_effort", upstream)
 		if errSet != nil {
+			// A failed set passes the original body through unchanged (matches openai/apply.go).
 			return body
 		}
 		return updated
