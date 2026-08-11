@@ -47,9 +47,68 @@ func isDeepSeekModel(model string) bool {
 	return strings.HasPrefix(model, "deepseek")
 }
 
+// zenReasoningLevels maps the reasoning_effort labels Zen clients may request
+// to the canonical labels sent upstream. The generic OpenAI thinking pipeline
+// converts "max" to a token budget and back to "xhigh", and it does not
+// recognize "mid" at all, so Zen re-applies these labels after the generic
+// pass. "mid" is a client-facing alias: Zen's upstream expects "medium".
+var zenReasoningLevels = map[string]string{
+	"low":   "low",
+	"mid":   "medium",
+	"high":  "high",
+	"xhigh": "xhigh",
+	"max":   "max",
+}
+
+// applyZenReasoningLevel ensures the request carries the client-requested Zen
+// reasoning level as reasoning_effort, mapped to the upstream label. It runs
+// after the generic thinking application and overrides its output for the Zen
+// label set:
+//   - Model suffix has priority (mirrors ApplyThinking's suffix priority):
+//     "(low)", "(mid)", "(high)", "(xhigh)", "(max)".
+//   - Otherwise, a body reasoning_effort in the Zen label set is normalized to
+//     its canonical lowercase upstream form (e.g. "MAX" -> "max", "mid" ->
+//     "medium") and kept verbatim.
+//
+// Levels outside the set (none, auto, minimal, medium, numeric budgets) are
+// left to the generic pipeline untouched.
+func applyZenReasoningLevel(body []byte, model string) []byte {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return body
+	}
+
+	if parsed := thinking.ParseSuffix(model); parsed.HasSuffix {
+		level := strings.ToLower(strings.TrimSpace(parsed.RawSuffix))
+		if upstream, ok := zenReasoningLevels[level]; ok {
+			updated, errSet := sjson.SetBytes(body, "reasoning_effort", upstream)
+			if errSet != nil {
+				return body
+			}
+			return updated
+		}
+	}
+
+	effort := gjson.GetBytes(body, "reasoning_effort")
+	if !effort.Exists() {
+		return body
+	}
+	level := strings.ToLower(strings.TrimSpace(effort.String()))
+	if upstream, ok := zenReasoningLevels[level]; ok {
+		updated, errSet := sjson.SetBytes(body, "reasoning_effort", upstream)
+		if errSet != nil {
+			return body
+		}
+		return updated
+	}
+	return body
+}
+
 // translateHook runs on the OpenAI-format body produced by the inner
 // OpenAICompatExecutor and applies Zen-specific normalisations:
 //   - Applies thinking configuration (the hook owns this when present).
+//   - Ensures the Zen reasoning labels (low/mid/high/xhigh/max) reach upstream
+//     as reasoning_effort ("mid" maps to "medium"), overriding generic budget
+//     round-trips.
 //   - For DeepSeek models: ensures assistant messages with tool_calls carry
 //     reasoning_content, which DeepSeek requires when thinking mode is active.
 func (e *ZenExecutor) translateHook(translated []byte, model string) []byte {
@@ -66,7 +125,12 @@ func (e *ZenExecutor) translateHook(translated []byte, model string) []byte {
 		translated = applied
 	}
 
-	// 2. For DeepSeek models, normalise reasoning_content in assistant messages.
+	// 2. Re-apply the Zen reasoning label set verbatim. The generic pipeline
+	// converts "max" to a budget (128000) and back to "xhigh", and drops the
+	// "mid" suffix; Zen forwards the requested label unchanged instead.
+	translated = applyZenReasoningLevel(translated, model)
+
+	// 3. For DeepSeek models, normalise reasoning_content in assistant messages.
 	if isDeepSeekModel(model) {
 		translated = normaliseDeepSeekReasoningContent(translated)
 	}
@@ -105,6 +169,16 @@ func normaliseDeepSeekReasoningContent(body []byte) []byte {
 			continue
 		}
 		role := strings.TrimSpace(msg.Get("role").String())
+
+		// A user or system message starts a new turn. Reasoning observed in an
+		// earlier turn must not leak into tool-call messages of later turns, so
+		// the carried fallback state is reset at the boundary. Tool messages
+		// stay within the same turn and keep the fallback available.
+		if role != "assistant" && role != "tool" {
+			latestReasoning = ""
+			hasLatestReasoning = false
+			continue
+		}
 		if role != "assistant" {
 			continue
 		}
