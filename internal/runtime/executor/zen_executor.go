@@ -32,6 +32,10 @@ type ZenExecutor struct {
 func NewZenExecutor(cfg *config.Config) *ZenExecutor {
 	e := &ZenExecutor{cfg: cfg}
 	e.inner = NewOpenAICompatExecutorWithHook(ZenProviderKey, cfg, e.translateHook)
+	// Apply provider-specific header defaults from config.
+	if cfg != nil {
+		e.inner.SetHeaderDefaults(&cfg.ZenHeaderDefaults)
+	}
 	return e
 }
 

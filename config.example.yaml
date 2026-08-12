@@ -510,6 +510,13 @@ nonstream-keepalive-interval: 0
 #   user-agent: "codex_cli_rs/0.114.0 (Mac OS 14.2.0; x86_64) vscode/1.111.0"
 #   beta-features: "multi_agent"
 
+# Default headers for OpenCode Zen requests.
+# These help bypass upstream provider restrictions (e.g., anti-bot measures).
+# When configured, the User-Agent header is sent with all Zen API requests.
+# This can help avoid detection as automated traffic by upstream providers.
+# zen-header-defaults:
+#   user-agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+
 # OpenAI compatibility providers
 # openai-compatibility:
 #   - name: "openrouter" # The name of the provider; it will be used in the user agent and other places.

@@ -82,3 +82,26 @@ func TestValidateCredentialWeightsIncludesZen(t *testing.T) {
 		t.Fatalf("ValidateCredentialWeights() error = %q, want mention of zen-api-key", errValidate)
 	}
 }
+
+func TestZenHeaderDefaultsParsing(t *testing.T) {
+	cfg, errParse := ParseConfigBytes([]byte(`zen-header-defaults:
+  user-agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+`))
+	if errParse != nil {
+		t.Fatalf("ParseConfigBytes() error = %v", errParse)
+	}
+	wantUA := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+	if got := cfg.ZenHeaderDefaults.UserAgent; got != wantUA {
+		t.Fatalf("ZenHeaderDefaults.UserAgent = %q, want %q", got, wantUA)
+	}
+}
+
+func TestZenHeaderDefaultsEmpty(t *testing.T) {
+	cfg, errParse := ParseConfigBytes([]byte(`zen-header-defaults: {}`))
+	if errParse != nil {
+		t.Fatalf("ParseConfigBytes() error = %v", errParse)
+	}
+	if got := cfg.ZenHeaderDefaults.UserAgent; got != "" {
+		t.Fatalf("ZenHeaderDefaults.UserAgent = %q, want empty", got)
+	}
+}

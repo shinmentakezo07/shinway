@@ -118,6 +118,14 @@ type CodexHeaderDefaults struct {
 	BetaFeatures string `yaml:"beta-features" json:"beta-features"`
 }
 
+// ZenHeaderDefaults configures default header values injected into OpenCode Zen
+// requests to help bypass upstream provider restrictions (e.g., anti-bot measures).
+// UserAgent specifies the User-Agent header; other headers can be configured
+// per-key in the zen-api-key.headers map.
+type ZenHeaderDefaults struct {
+	UserAgent string `yaml:"user-agent" json:"user-agent"`
+}
+
 // XAIConfig configures provider-wide xAI request behavior.
 type XAIConfig struct {
 	// InjectXSearch injects xAI's native x_search tool when the request does not declare it.

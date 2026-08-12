@@ -138,6 +138,10 @@ type Config struct {
 	// These are used as fallbacks when the client does not send its own headers.
 	ClaudeHeaderDefaults ClaudeHeaderDefaults `yaml:"claude-header-defaults" json:"claude-header-defaults"`
 
+	// ZenHeaderDefaults configures default header values for OpenCode Zen requests.
+	// These help bypass upstream provider restrictions (e.g., anti-bot measures).
+	ZenHeaderDefaults ZenHeaderDefaults `yaml:"zen-header-defaults" json:"zen-header-defaults"`
+
 	// DisableClaudeCloakMode globally disables Claude request cloaking when true.
 	// Cloaking disguises requests as the official Claude Code CLI and replaces the
 	// system prompt. When true, every Claude credential defaults to no cloaking

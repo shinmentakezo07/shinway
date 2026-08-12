@@ -442,3 +442,155 @@ func TestOpenAICompatExecutorStreamSkipsKeepAliveUntilDataLine(t *testing.T) {
 		t.Fatalf("stream payload = %s", got.String())
 	}
 }
+
+// TestOpenAICompatExecutorUsesDefaultUserAgent verifies that the executor sends
+// the default User-Agent when no header defaults are configured.
+func TestOpenAICompatExecutorUsesDefaultUserAgent(t *testing.T) {
+	var gotUA string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl_1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer server.Close()
+
+	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test",
+	}}
+	_, err := executor.Execute(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "test-model",
+		Payload: []byte(`{"model":"test-model","messages":[{"role":"user","content":"hi"}]}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       false,
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if gotUA != "cli-proxy-openai-compat" {
+		t.Fatalf("User-Agent = %q, want %q", gotUA, "cli-proxy-openai-compat")
+	}
+}
+
+// TestOpenAICompatExecutorUsesCustomUserAgent verifies that the executor sends
+// the custom User-Agent when header defaults are configured.
+func TestOpenAICompatExecutorUsesCustomUserAgent(t *testing.T) {
+	var gotUA string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl_1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer server.Close()
+
+	customUA := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+	cfg := &config.Config{
+		ZenHeaderDefaults: config.ZenHeaderDefaults{
+			UserAgent: customUA,
+		},
+	}
+	executor := NewOpenAICompatExecutor("zen", cfg)
+	executor.SetHeaderDefaults(&cfg.ZenHeaderDefaults)
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test",
+	}}
+	_, err := executor.Execute(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "test-model",
+		Payload: []byte(`{"model":"test-model","messages":[{"role":"user","content":"hi"}]}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       false,
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if gotUA != customUA {
+		t.Fatalf("User-Agent = %q, want %q", gotUA, customUA)
+	}
+}
+
+// TestOpenAICompatExecutorStreamUsesCustomUserAgent verifies that the executor sends
+// the custom User-Agent in streaming requests when header defaults are configured.
+func TestOpenAICompatExecutorStreamUsesCustomUserAgent(t *testing.T) {
+	var gotUA string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(`data: {"id":"chatcmpl_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"hello"},"finish_reason":null}]}` + "\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n"))
+	}))
+	defer server.Close()
+
+	customUA := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+	cfg := &config.Config{
+		ZenHeaderDefaults: config.ZenHeaderDefaults{
+			UserAgent: customUA,
+		},
+	}
+	executor := NewOpenAICompatExecutor("zen", cfg)
+	executor.SetHeaderDefaults(&cfg.ZenHeaderDefaults)
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test",
+	}}
+	_, err := executor.ExecuteStream(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "test-model",
+		Payload: []byte(`{"model":"test-model","messages":[{"role":"user","content":"hi"}],"stream":true}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       true,
+	})
+	if err != nil {
+		t.Fatalf("ExecuteStream error: %v", err)
+	}
+	if gotUA != customUA {
+		t.Fatalf("User-Agent = %q, want %q", gotUA, customUA)
+	}
+}
+
+// TestOpenAICompatExecutorImagesUsesCustomUserAgent verifies that the executor sends
+// the custom User-Agent in image generation requests when header defaults are configured.
+func TestOpenAICompatExecutorImagesUsesCustomUserAgent(t *testing.T) {
+	var gotUA string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":123,"data":[{"b64_json":"AA=="}],"usage":{"total_tokens":1}}`))
+	}))
+	defer server.Close()
+
+	customUA := "curl/8.7.1"
+	cfg := &config.Config{
+		ZenHeaderDefaults: config.ZenHeaderDefaults{
+			UserAgent: customUA,
+		},
+	}
+	executor := NewOpenAICompatExecutor("zen", cfg)
+	executor.SetHeaderDefaults(&cfg.ZenHeaderDefaults)
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test",
+	}}
+	_, err := executor.Execute(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "test-image",
+		Payload: []byte(`{"model":"test-image","prompt":"draw"}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai-image"),
+		Stream:       false,
+		Headers: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Metadata: map[string]any{
+			shinwayexecutor.RequestPathMetadataKey: "/v1/images/generations",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if gotUA != customUA {
+		t.Fatalf("User-Agent = %q, want %q", gotUA, customUA)
+	}
+}

@@ -47,6 +47,9 @@ type OpenAICompatExecutor struct {
 	// by providers with format-specific post-translation quirks (e.g., NVIDIA NIM
 	// chat_template_kwargs).
 	translateHook func(body []byte, model string) []byte
+	// headerDefaults provides optional provider-specific default header values.
+	// When non-nil, these are used as fallbacks for headers the client does not send.
+	headerDefaults *config.ZenHeaderDefaults
 }
 
 // NewOpenAICompatExecutor creates an executor bound to a provider key (e.g., "openrouter").
@@ -60,8 +63,23 @@ func NewOpenAICompatExecutorWithHook(provider string, cfg *config.Config, hook f
 	return &OpenAICompatExecutor{provider: provider, cfg: cfg, translateHook: hook}
 }
 
+// SetHeaderDefaults sets provider-specific default header values for the executor.
+// When set, these are used as fallbacks for headers the client does not send.
+func (e *OpenAICompatExecutor) SetHeaderDefaults(defaults *config.ZenHeaderDefaults) {
+	e.headerDefaults = defaults
+}
+
 // Identifier implements shinwayauth.ProviderExecutor.
 func (e *OpenAICompatExecutor) Identifier() string { return e.provider }
+
+// resolveUserAgent returns the appropriate User-Agent for the request.
+// Priority: 1. Provider-specific header defaults, 2. Default proxy UA.
+func (e *OpenAICompatExecutor) resolveUserAgent() string {
+	if e.headerDefaults != nil && e.headerDefaults.UserAgent != "" {
+		return e.headerDefaults.UserAgent
+	}
+	return "cli-proxy-openai-compat"
+}
 
 // PrepareRequest injects OpenAI-compatible credentials into the outgoing HTTP request.
 func (e *OpenAICompatExecutor) PrepareRequest(req *http.Request, auth *shinwayauth.Auth) error {
@@ -161,7 +179,7 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *shinwayauth.Au
 	if apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	httpReq.Header.Set("User-Agent", "cli-proxy-openai-compat")
+	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -252,7 +270,7 @@ func (e *OpenAICompatExecutor) executeImages(ctx context.Context, auth *shinwaya
 	if apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	httpReq.Header.Set("User-Agent", "cli-proxy-openai-compat")
+	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -366,7 +384,7 @@ func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *shinwaya
 	if apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	httpReq.Header.Set("User-Agent", "cli-proxy-openai-compat")
+	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -521,7 +539,7 @@ func (e *OpenAICompatExecutor) executeImagesStream(ctx context.Context, auth *sh
 	if apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	httpReq.Header.Set("User-Agent", "cli-proxy-openai-compat")
+	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
