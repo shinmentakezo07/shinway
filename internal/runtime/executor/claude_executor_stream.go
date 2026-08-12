@@ -18,6 +18,17 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// maxClaudeStreamLineBytes bounds per-line buffering. Real SSE lines (tool
+// calls, text deltas) are small; 8 MiB covers pathological single-line
+// payloads while bounding retained memory per connection.
+const maxClaudeStreamLineBytes = 8 << 20
+
+func claudeStreamScanner(r io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, maxClaudeStreamLineBytes)
+	return scanner
+}
+
 func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Auth, req shinwayexecutor.Request, opts shinwayexecutor.Options) (_ *shinwayexecutor.StreamResult, err error) {
 	if opts.Alt == "responses/compact" {
 		return nil, statusErr{code: http.StatusNotImplemented, msg: "/responses/compact not supported"}
@@ -185,8 +196,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Au
 
 		// If the response target is Claude, directly forward complete SSE events without translation.
 		if responseFormat == to {
-			scanner := bufio.NewScanner(decodedBody)
-			scanner.Buffer(nil, 52_428_800) // 50MB
+			scanner := claudeStreamScanner(decodedBody)
 			var event bytes.Buffer
 			flushEvent := func() bool {
 				if event.Len() == 0 {
@@ -230,8 +240,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Au
 		}
 
 		// For other formats, use translation
-		scanner := bufio.NewScanner(decodedBody)
-		scanner.Buffer(nil, 52_428_800) // 50MB
+		scanner := claudeStreamScanner(decodedBody)
 		var param any
 		for scanner.Scan() {
 			line := scanner.Bytes()
@@ -272,8 +281,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Au
 }
 
 func validateClaudeStreamingResponse(data []byte) error {
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(nil, 52_428_800)
+	scanner := claudeStreamScanner(bytes.NewReader(data))
 
 	hasData := false
 	hasMessageStart := false

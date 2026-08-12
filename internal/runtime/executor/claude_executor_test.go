@@ -3130,3 +3130,13 @@ func TestRemapOAuthToolNames_AllReferencesRenamedConsistently(t *testing.T) {
 		t.Fatalf("reverseMap[WebFetch] = %q, want webfetch", reverseMap["WebFetch"])
 	}
 }
+
+func TestClaudeStreamScanner_RejectsOversizedLine(t *testing.T) {
+	// (8<<20)/6 repetitions is only 8_388_606 bytes (< cap); one more is > 8 MiB.
+	big := bytes.Repeat([]byte("data: "), maxClaudeStreamLineBytes/6+1) // > 8 MiB line
+	scanner := claudeStreamScanner(bytes.NewReader(big))
+	scanner.Scan()
+	if err := scanner.Err(); err == nil {
+		t.Fatal("expected token too long error for oversized line")
+	}
+}
