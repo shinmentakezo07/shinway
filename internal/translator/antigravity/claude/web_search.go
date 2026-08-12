@@ -26,6 +26,11 @@ type webSearchCitedTextBlock struct {
 
 const antigravityWebSearchSystemInstruction = "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar."
 
+// claudeWebSearchDeltaRunes is the max runes per text_delta when streaming a
+// cited web-search text block, sized for fewer SSE events per cited block
+// while keeping incremental output.
+const claudeWebSearchDeltaRunes = 256
+
 func antigravitySupportsNativeGoogleSearch(model string) bool {
 	return registry.AntigravityWebSearchModelFor(model) != ""
 }
@@ -469,7 +474,7 @@ func appendClaudeWebSearchStreamBlocks(appendEvent func(string, string), startIn
 			citationDelta := fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"citations_delta","citation":%s}}`, contentIndex, string(citationJSON))
 			appendEvent("content_block_delta", citationDelta)
 		}
-		for _, chunk := range splitRunesForWebSearch(block.Text, 50) {
+		for _, chunk := range splitRunesForWebSearch(block.Text, claudeWebSearchDeltaRunes) {
 			textDelta := fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":""}}`, contentIndex)
 			textDelta, _ = sjson.Set(textDelta, "delta.text", chunk)
 			appendEvent("content_block_delta", textDelta)

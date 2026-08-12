@@ -312,6 +312,24 @@ func TestBuildWebSearchCitedTextBlocks_TrimsOverlappingGroundingSupports(t *test
 	}
 }
 
+func TestSplitRunesForWebSearch_256RuneChunks(t *testing.T) {
+	text := strings.Repeat("é", 1000)
+	chunks := splitRunesForWebSearch(text, 256)
+	if len(chunks) != 4 {
+		t.Fatalf("len(chunks) = %d, want 4", len(chunks))
+	}
+	total := 0
+	for _, c := range chunks {
+		if len([]rune(c)) > 256 {
+			t.Fatalf("chunk exceeds 256 runes: %d", len([]rune(c)))
+		}
+		total += len([]rune(c))
+	}
+	if total != 1000 {
+		t.Fatalf("total runes = %d, want 1000", total)
+	}
+}
+
 func sseDataForEvent(t *testing.T, output string, eventName string) string {
 	t.Helper()
 
