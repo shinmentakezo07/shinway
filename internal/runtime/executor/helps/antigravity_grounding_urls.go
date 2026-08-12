@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
 	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
@@ -13,6 +15,17 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+const groundingURLCacheTTL = 60 * time.Second
+
+type groundingURLEntry struct {
+	uri string
+	at  time.Time
+}
+
+// groundingURLCache caches resolved Vertex Search redirect URIs (key: raw URI)
+// so repeated grounding chunks within/across requests reuse the HEAD result.
+var groundingURLCache sync.Map
 
 func isAntigravityVertexSearchRedirect(rawURL string) bool {
 	parsed, err := url.Parse(rawURL)
@@ -27,6 +40,12 @@ func isAntigravityVertexSearchRedirect(rawURL string) bool {
 func resolveAntigravityGroundingURL(ctx context.Context, cfg *config.Config, auth *shinwayauth.Auth, rawURL string) string {
 	if !isAntigravityVertexSearchRedirect(rawURL) {
 		return rawURL
+	}
+	if entry, ok := groundingURLCache.Load(rawURL); ok {
+		cached := entry.(groundingURLEntry)
+		if time.Since(cached.at) < groundingURLCacheTTL {
+			return cached.uri
+		}
 	}
 	client := NewProxyAwareHTTPClient(ctx, cfg, auth, 0)
 	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
@@ -59,6 +78,7 @@ func resolveAntigravityGroundingURL(ctx context.Context, cfg *config.Config, aut
 	if errParse != nil || parsed.Scheme != "https" || parsed.Host == "" {
 		return rawURL
 	}
+	groundingURLCache.Store(rawURL, groundingURLEntry{uri: location, at: time.Now()})
 	return location
 }
 
