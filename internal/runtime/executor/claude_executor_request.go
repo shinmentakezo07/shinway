@@ -593,8 +593,20 @@ func remapOAuthToolNames(body []byte) ([]byte, map[string]string) {
 		}
 	}
 
-	// 3. Rename tool references in messages
+	// 3. Rename tool references in messages: collect every rename during a single
+	// read-only traversal, then rebuild the messages array once and apply all
+	// renames in a single final pass. Each rename is applied against its own
+	// message's raw JSON (message-relative path), never the whole body, so cost is
+	// O(rename x message size) instead of O(rename x full body). Rebuilding from
+	// msg.Raw snapshots is safe here (unlike the tools array above) because
+	// messages are never removed — only renamed — so indices in the rebuilt array
+	// match the snapshot.
+	type rename struct {
+		path string
+		val  string
+	}
 	messages := gjson.GetBytes(body, "messages")
+	renamesByMessage := map[int][]rename{}
 	if messages.Exists() && messages.IsArray() {
 		messages.ForEach(func(msgIndex, msg gjson.Result) bool {
 			content := msg.Get("content")
@@ -607,29 +619,37 @@ func remapOAuthToolNames(body []byte) ([]byte, map[string]string) {
 				case "tool_use":
 					name := part.Get("name").String()
 					if newName, ok := oauthToolRenameMap[name]; ok && newName != name {
-						path := fmt.Sprintf("messages.%d.content.%d.name", msgIndex.Int(), contentIndex.Int())
-						body, _ = sjson.SetBytes(body, path, newName)
+						idx := int(msgIndex.Int())
+						renamesByMessage[idx] = append(renamesByMessage[idx], rename{
+							path: fmt.Sprintf("content.%d.name", contentIndex.Int()),
+							val:  newName,
+						})
 						recordRename(name, newName)
 					}
 				case "tool_reference":
 					toolName := part.Get("tool_name").String()
 					if newName, ok := oauthToolRenameMap[toolName]; ok && newName != toolName {
-						path := fmt.Sprintf("messages.%d.content.%d.tool_name", msgIndex.Int(), contentIndex.Int())
-						body, _ = sjson.SetBytes(body, path, newName)
+						idx := int(msgIndex.Int())
+						renamesByMessage[idx] = append(renamesByMessage[idx], rename{
+							path: fmt.Sprintf("content.%d.tool_name", contentIndex.Int()),
+							val:  newName,
+						})
 						recordRename(toolName, newName)
 					}
 				case "tool_result":
-					// Handle nested tool_reference blocks inside tool_result.content[]
-					toolID := part.Get("tool_use_id").String()
-					_ = toolID // tool_use_id stays as-is
+					// Handle nested tool_reference blocks inside tool_result.content[].
+					// tool_use_id stays as-is.
 					nestedContent := part.Get("content")
 					if nestedContent.Exists() && nestedContent.IsArray() {
 						nestedContent.ForEach(func(nestedIndex, nestedPart gjson.Result) bool {
 							if nestedPart.Get("type").String() == "tool_reference" {
 								nestedToolName := nestedPart.Get("tool_name").String()
 								if newName, ok := oauthToolRenameMap[nestedToolName]; ok && newName != nestedToolName {
-									nestedPath := fmt.Sprintf("messages.%d.content.%d.content.%d.tool_name", msgIndex.Int(), contentIndex.Int(), nestedIndex.Int())
-									body, _ = sjson.SetBytes(body, nestedPath, newName)
+									idx := int(msgIndex.Int())
+									renamesByMessage[idx] = append(renamesByMessage[idx], rename{
+										path: fmt.Sprintf("content.%d.content.%d.tool_name", contentIndex.Int(), nestedIndex.Int()),
+										val:  newName,
+									})
 									recordRename(nestedToolName, newName)
 								}
 							}
@@ -641,6 +661,29 @@ func remapOAuthToolNames(body []byte) ([]byte, map[string]string) {
 			})
 			return true
 		})
+	}
+	if len(renamesByMessage) > 0 {
+		var messagesJSON strings.Builder
+		messagesJSON.Grow(len(messages.Raw) + 64*len(renamesByMessage))
+		messagesJSON.WriteByte('[')
+		first := true
+		messages.ForEach(func(msgIndex, msg gjson.Result) bool {
+			msgRaw := msg.Raw
+			for _, rn := range renamesByMessage[int(msgIndex.Int())] {
+				updated, err := sjson.Set(msgRaw, rn.path, rn.val)
+				if err == nil {
+					msgRaw = updated
+				}
+			}
+			if !first {
+				messagesJSON.WriteByte(',')
+			}
+			first = false
+			messagesJSON.WriteString(msgRaw)
+			return true
+		})
+		messagesJSON.WriteByte(']')
+		body, _ = sjson.SetRawBytes(body, "messages", []byte(messagesJSON.String()))
 	}
 
 	return body, reverseMap

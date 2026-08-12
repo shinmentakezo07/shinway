@@ -3090,3 +3090,43 @@ func TestPrependToFirstUserMessage_PrependsWhenNoLeadingToolResult(t *testing.T)
 		t.Fatalf("original block should follow, got %q: %s", got, out)
 	}
 }
+
+func BenchmarkRemapOAuthToolNames_LongConversation(b *testing.B) {
+	var messages []string
+	for i := 0; i < 100; i++ {
+		msg := fmt.Sprintf(`{"role":"assistant","content":[{"type":"tool_use","id":"tu%d","name":"webfetch","input":{"url":"https://example.com/%d"}}]}`, i, i)
+		messages = append(messages, msg)
+		msg = fmt.Sprintf(`{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu%d","content":"ok %d"}]}`, i, i)
+		messages = append(messages, msg)
+	}
+	body := []byte(`{"tools":[{"name":"webfetch","description":"f"}],"messages":[` + strings.Join(messages, ",") + `]}`)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, _ := remapOAuthToolNames(body)
+		if len(out) == 0 {
+			b.Fatal("empty output")
+		}
+	}
+}
+
+func TestRemapOAuthToolNames_AllReferencesRenamedConsistently(t *testing.T) {
+	body := []byte(`{"tools":[{"name":"webfetch","description":"f"}],
+"messages":[
+ {"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"webfetch","input":{"url":"u"}}]},
+ {"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","content":[{"type":"tool_reference","tool_name":"webfetch"}]}]}
+]}`)
+	out, reverseMap := remapOAuthToolNames(body)
+	if got := gjson.GetBytes(out, "tools.0.name").String(); got != "WebFetch" {
+		t.Fatalf("tools[0].name = %q, want WebFetch", got)
+	}
+	if got := gjson.GetBytes(out, "messages.0.content.0.name").String(); got != "WebFetch" {
+		t.Fatalf("tool_use name = %q, want WebFetch", got)
+	}
+	if got := gjson.GetBytes(out, "messages.1.content.0.content.0.tool_name").String(); got != "WebFetch" {
+		t.Fatalf("nested tool_reference name = %q, want WebFetch", got)
+	}
+	if reverseMap["WebFetch"] != "webfetch" {
+		t.Fatalf("reverseMap[WebFetch] = %q, want webfetch", reverseMap["WebFetch"])
+	}
+}
