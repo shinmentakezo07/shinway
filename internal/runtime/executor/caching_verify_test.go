@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -342,4 +343,27 @@ func TestCacheControlOrder(t *testing.T) {
 	}
 
 	t.Log("cache order correct: tools -> system")
+}
+
+func TestCacheControlPipeline_EquivalenceWithChain(t *testing.T) {
+	body := []byte(`{"tools":[{"name":"a"},{"name":"b"}],"system":[{"text":"s1"},{"text":"s2"}],
+"messages":[
+ {"role":"user","content":[{"type":"text","text":"u1"}]},
+ {"role":"assistant","content":[{"type":"text","text":"a1"}]},
+ {"role":"user","content":[{"type":"text","text":"u2"}]}
+]}`)
+	// The pipeline is only applied when the request has NO cache_control already.
+	// enforceCacheControlLimit needs maxBlocks param; replicate the executor call:
+	old := body
+	old = ensureCacheControl(old)
+	old = enforceCacheControlLimit(old, 4)
+	old = normalizeCacheControlTTL(old)
+
+	got := applyCacheControlPipeline(body)
+	if !bytes.Equal(old, got) {
+		t.Fatalf("pipeline output differs from old chain:\nold: %s\ngot: %s", old, got)
+	}
+	if countCacheControls(got) > 4 {
+		t.Fatalf("pipeline produced %d cache_control blocks, limit is 4", countCacheControls(got))
+	}
 }

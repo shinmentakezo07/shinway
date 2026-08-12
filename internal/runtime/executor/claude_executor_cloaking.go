@@ -509,6 +509,14 @@ func countCacheControls(payload []byte) int {
 	return count
 }
 
+// applyCacheControlPipeline performs inject → cap → TTL-normalize in one
+// function so callers avoid re-parsing the payload for each transform.
+// It is equivalent to ensureCacheControl + enforceCacheControlLimit(4) +
+// normalizeCacheControlTTL applied in order.
+func applyCacheControlPipeline(payload []byte) []byte {
+	return normalizeCacheControlTTL(enforceCacheControlLimit(ensureCacheControl(payload), 4))
+}
+
 // normalizeCacheControlTTL ensures cache_control TTL values don't violate the
 // prompt-caching-scope-2026-01-05 ordering constraint: a 1h-TTL block must not
 // appear after a 5m-TTL block anywhere in the evaluation order.

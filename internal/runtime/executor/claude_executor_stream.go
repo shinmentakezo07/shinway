@@ -80,16 +80,14 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *shinwayauth.Au
 	// thinking blocks unless display is set to "summarized".
 	body = ensureClaudeThinkingDisplay(body)
 
-	// Auto-inject cache_control if missing (optimization for ClawdBot/clients without caching support)
+	// Auto-inject cache_control if missing, then cap to 4 breakpoints and
+	// normalize TTL ordering in a single pass (see applyCacheControlPipeline).
 	if countCacheControls(body) == 0 {
-		body = ensureCacheControl(body)
+		body = applyCacheControlPipeline(body)
+	} else {
+		body = enforceCacheControlLimit(body, 4)
+		body = normalizeCacheControlTTL(body)
 	}
-
-	// Enforce Anthropic's cache_control block limit (max 4 breakpoints per request).
-	body = enforceCacheControlLimit(body, 4)
-
-	// Normalize TTL values to prevent ordering violations under prompt-caching-scope-2026-01-05.
-	body = normalizeCacheControlTTL(body)
 
 	// Extract betas from body and convert to header
 	var extraBetas []string

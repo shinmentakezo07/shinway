@@ -122,8 +122,12 @@ func (e *ClaudeExecutor) countTokensUpstream(ctx context.Context, auth *shinwaya
 	}
 
 	// Keep count_tokens requests compatible with Anthropic cache-control constraints too.
-	body = enforceCacheControlLimit(body, 4)
-	body = normalizeCacheControlTTL(body)
+	if countCacheControls(body) == 0 {
+		body = applyCacheControlPipeline(body)
+	} else {
+		body = enforceCacheControlLimit(body, 4)
+		body = normalizeCacheControlTTL(body)
+	}
 
 	// Extract betas from body and convert to header (for count_tokens too)
 	var extraBetas []string
