@@ -119,6 +119,47 @@ PackyCode 为本软件用户提供了特别优惠：使用<a href="https://www.p
 - 支持 Grok Build 多账户轮询
 - 通过配置接入上游 OpenAI 兼容提供商（例如 OpenRouter）
 - 可复用的 Go SDK（见 `docs/sdk-usage_CN.md`）
+- OpenCode Zen 提供商支持，可配置自定义 User-Agent 绕过上游限制
+
+## OpenCode Zen 配置
+
+OpenCode Zen 提供商支持配置自定义请求头，帮助绕过上游提供商的限制（例如反机器人措施）。通过配置 `zen-header-defaults`，可以发送浏览器类或合法的 User-Agent 字符串，而不是默认的代理标识符。
+
+### 配置示例
+
+```yaml
+zen-header-defaults:
+  user-agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+```
+
+### 使用场景
+
+- 绕过上游提供商的反机器人检测
+- 避免因 User-Agent 被识别为自动化工具而被限制
+- 模拟浏览器请求以获得更好的兼容性
+
+### Zen API 密钥配置
+
+```yaml
+zen-api-key:
+  - api-key: "oc-..."
+    weight: 5  # 可选：加权轮询份额；省略默认为 1；最大 1,000,000
+    prefix: "zen"  # 可选：要求调用如 "zen/glm-5.2" 来定位此凭据
+    disable-cooling: false  # 可选：覆盖此凭据的认证/模型冷却调度
+    base-url: "https://opencode.ai/zen/v1"  # 可选；默认为主持的 Zen 端点
+    headers:
+      X-Custom-Header: "custom-value"
+    proxy-url: "socks5://proxy.example.com:1080"
+    models:
+      - name: "glm-5.2"
+        alias: "glm-5.2"
+        display-name: "GLM 5.2"
+        force-mapping: true
+      - name: "deepseek-v4-pro"
+        alias: "dsv4-pro"
+    excluded-models:
+      - "*-free"  # 排除免费促销模型
+```
 
 ## 新手入门
 
