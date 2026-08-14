@@ -237,13 +237,23 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 					t.Errorf("upgrade websocket: %v", errUpgrade)
 					return
 				}
-				connection := connections.Add(1)
+				_ = connections.Add(1)
 				defer func() { _ = conn.Close() }()
-				if connection == 1 {
-					_, _, _ = conn.ReadMessage()
-					return
-				}
-				if connection == 2 {
+				// Every connection follows the same deterministic script: wait for
+				// the client's first message, then reply with a completion. The
+				// prime and retry connections are closed by the client before they
+				// send anything (stale write deadline / rejected bind), so their
+				// reads error out and the handlers return. The second request's
+				// connection sends the request and receives the completion.
+				//
+				// The script must NOT key behavior on the connection counter:
+				// httptest dispatches each upgrade in its own goroutine, so a later
+				// dial can be processed before an earlier one (racing goroutine
+				// scheduling). A count-keyed "connection == 2: close immediately"
+				// branch could then close the second request's connection instead of
+				// the retry one, producing a spurious 1006/hang flake.
+				if errDeadline := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); errDeadline != nil {
+					t.Errorf("set read deadline: %v", errDeadline)
 					return
 				}
 				if _, _, errRead := conn.ReadMessage(); errRead != nil {

@@ -2,11 +2,16 @@ package executor
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/config"
+	shinwayauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 	shinwayexecutor "github.com/shinmentakezo07/shinway/v7/sdk/shinway/executor"
+	sdktranslator "github.com/shinmentakezo07/shinway/v7/sdk/translator"
 	"github.com/tidwall/gjson"
 )
 
@@ -244,5 +249,182 @@ func TestZenExecutorTranslateHookNoEffortStaysAbsent(t *testing.T) {
 
 	if got := gjson.GetBytes(translated, "reasoning_effort"); got.Exists() {
 		t.Fatalf("reasoning_effort unexpectedly set: %s", got.Raw)
+	}
+}
+
+// zenHeaderCaptureServer starts a chat-completions test server that records the
+// request headers it receives and returns a minimal OpenAI completion.
+func zenHeaderCaptureServer(t *testing.T, capture *http.Header) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*capture = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"chatcmpl_1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`)
+	}))
+}
+
+// TestZenExecutorSendsOpencodeIdentityHeaders verifies that Zen requests carry
+// the same request-identity headers as the real opencode client by default:
+// HTTP-Referer: https://opencode.ai/, X-Title: opencode, and an opencode
+// User-Agent, instead of the generic cli-proxy-openai-compat identity.
+func TestZenExecutorSendsOpencodeIdentityHeaders(t *testing.T) {
+	var got http.Header
+	server := zenHeaderCaptureServer(t, &got)
+	defer server.Close()
+
+	executor := NewZenExecutor(&config.Config{})
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test-key",
+	}}
+	_, err := executor.Execute(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "deepseek-v4-flash-free",
+		Payload: []byte(`{"model":"deepseek-v4-flash-free","messages":[{"role":"user","content":"hi"}]}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       false,
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if gotVal := got.Get("HTTP-Referer"); gotVal != "https://opencode.ai/" {
+		t.Fatalf("HTTP-Referer = %q, want %q", gotVal, "https://opencode.ai/")
+	}
+	if gotVal := got.Get("X-Title"); gotVal != "opencode" {
+		t.Fatalf("X-Title = %q, want %q", gotVal, "opencode")
+	}
+	if gotVal := got.Get("User-Agent"); gotVal != zenDefaultUserAgent {
+		t.Fatalf("User-Agent = %q, want %q", gotVal, zenDefaultUserAgent)
+	}
+}
+
+// TestZenExecutorConfiguredHeaderDefaultsOverrideOpencode verifies that
+// zen-header-defaults values take precedence over the opencode defaults.
+func TestZenExecutorConfiguredHeaderDefaultsOverrideOpencode(t *testing.T) {
+	var got http.Header
+	server := zenHeaderCaptureServer(t, &got)
+	defer server.Close()
+
+	cfg := &config.Config{
+		ZenHeaderDefaults: config.ZenHeaderDefaults{
+			HTTPReferer: "https://custom.example.com/",
+			XTitle:      "my-title",
+			UserAgent:   "custom-agent/1.0",
+		},
+	}
+	executor := NewZenExecutor(cfg)
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test-key",
+	}}
+	_, err := executor.Execute(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "glm-5.2",
+		Payload: []byte(`{"model":"glm-5.2","messages":[{"role":"user","content":"hi"}]}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       false,
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if gotVal := got.Get("HTTP-Referer"); gotVal != "https://custom.example.com/" {
+		t.Fatalf("HTTP-Referer = %q, want custom", gotVal)
+	}
+	if gotVal := got.Get("X-Title"); gotVal != "my-title" {
+		t.Fatalf("X-Title = %q, want custom", gotVal)
+	}
+	if gotVal := got.Get("User-Agent"); gotVal != "custom-agent/1.0" {
+		t.Fatalf("User-Agent = %q, want custom", gotVal)
+	}
+}
+
+// TestZenExecutorPerKeyCustomHeaderWinsOverDefault verifies that per-key custom
+// headers (zen-api-key.headers) override the opencode identity defaults.
+func TestZenExecutorPerKeyCustomHeaderWinsOverDefault(t *testing.T) {
+	var got http.Header
+	server := zenHeaderCaptureServer(t, &got)
+	defer server.Close()
+
+	executor := NewZenExecutor(&config.Config{})
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url":       server.URL + "/v1",
+		"api_key":        "test-key",
+		"header:X-Title": "key-title",
+	}}
+	_, err := executor.Execute(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "kimi-k2.5",
+		Payload: []byte(`{"model":"kimi-k2.5","messages":[{"role":"user","content":"hi"}]}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       false,
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if gotVal := got.Get("X-Title"); gotVal != "key-title" {
+		t.Fatalf("X-Title = %q, want per-key override %q", gotVal, "key-title")
+	}
+	// The default Referer must still be present when only X-Title is overridden.
+	if gotVal := got.Get("HTTP-Referer"); gotVal != "https://opencode.ai/" {
+		t.Fatalf("HTTP-Referer = %q, want default", gotVal)
+	}
+}
+
+// TestZenExecutorStreamSendsOpencodeIdentityHeaders verifies streaming requests
+// carry the opencode identity headers as well.
+func TestZenExecutorStreamSendsOpencodeIdentityHeaders(t *testing.T) {
+	var got http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"id\":\"chatcmpl_1\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	executor := NewZenExecutor(&config.Config{})
+	auth := &shinwayauth.Auth{Attributes: map[string]string{
+		"base_url": server.URL + "/v1",
+		"api_key":  "test-key",
+	}}
+	result, err := executor.ExecuteStream(context.Background(), auth, shinwayexecutor.Request{
+		Model:   "deepseek-v4-flash-free",
+		Payload: []byte(`{"model":"deepseek-v4-flash-free","messages":[{"role":"user","content":"hi"}],"stream":true}`),
+	}, shinwayexecutor.Options{
+		SourceFormat: sdktranslator.FromString("openai"),
+		Stream:       true,
+	})
+	if err != nil {
+		t.Fatalf("ExecuteStream error: %v", err)
+	}
+	for chunk := range result.Chunks {
+		if chunk.Err != nil {
+			t.Fatalf("stream error: %v", chunk.Err)
+		}
+	}
+	if gotVal := got.Get("HTTP-Referer"); gotVal != "https://opencode.ai/" {
+		t.Fatalf("stream HTTP-Referer = %q, want default", gotVal)
+	}
+	if gotVal := got.Get("X-Title"); gotVal != "opencode" {
+		t.Fatalf("stream X-Title = %q, want default", gotVal)
+	}
+	if gotVal := got.Get("User-Agent"); gotVal != zenDefaultUserAgent {
+		t.Fatalf("stream User-Agent = %q, want %q", gotVal, zenDefaultUserAgent)
+	}
+}
+
+// TestZenExecutorPrepareRequestAppliesHeaderDefaults verifies the auth-flow
+// PrepareRequest path also injects the opencode identity headers.
+func TestZenExecutorPrepareRequestAppliesHeaderDefaults(t *testing.T) {
+	executor := NewZenExecutor(&config.Config{})
+	req := httptest.NewRequest(http.MethodPost, "https://opencode.ai/zen/v1/chat/completions", strings.NewReader(`{}`))
+	err := executor.PrepareRequest(req, &shinwayauth.Auth{Attributes: map[string]string{"api_key": "test-key"}})
+	if err != nil {
+		t.Fatalf("PrepareRequest error: %v", err)
+	}
+	if gotVal := req.Header.Get("HTTP-Referer"); gotVal != "https://opencode.ai/" {
+		t.Fatalf("HTTP-Referer = %q, want default", gotVal)
+	}
+	if gotVal := req.Header.Get("X-Title"); gotVal != "opencode" {
+		t.Fatalf("X-Title = %q, want default", gotVal)
 	}
 }

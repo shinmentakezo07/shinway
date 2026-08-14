@@ -17,11 +17,25 @@ import (
 // ZenProviderKey identifies the OpenCode Zen provider in routing, config, and registry.
 const ZenProviderKey = "zen"
 
+// Default request-identity header values mirroring what the real opencode
+// client sends to OpenCode Zen (https://github.com/anomalyco/opencode): the
+// zenmux plugin injects HTTP-Referer and X-Title, and opencode identifies
+// itself with an opencode/... User-Agent. These are used when the user has not
+// configured overrides in zen-header-defaults.
+const (
+	zenDefaultHTTPReferer = "https://opencode.ai/"
+	zenDefaultXTitle      = "opencode"
+	zenDefaultUserAgent   = "opencode/1.18.18"
+)
+
 // ZenExecutor executes OpenCode Zen requests through the shared OpenAI-compatible
 // executor with a post-translation hook that normalises DeepSeek reasoning_content
 // requirements. Zen (https://opencode.ai/zen/v1) exposes a standard OpenAI chat
 // completions gateway; the hook ensures assistant messages carry reasoning_content
-// when thinking mode is active, which DeepSeek models require.
+// when thinking mode is active, which DeepSeek models require. Outgoing requests
+// carry the same request-identity headers as the real opencode client
+// (HTTP-Referer: https://opencode.ai/, X-Title: opencode) unless overridden in
+// zen-header-defaults.
 type ZenExecutor struct {
 	inner *OpenAICompatExecutor
 	cfg   *config.Config
@@ -32,10 +46,25 @@ type ZenExecutor struct {
 func NewZenExecutor(cfg *config.Config) *ZenExecutor {
 	e := &ZenExecutor{cfg: cfg}
 	e.inner = NewOpenAICompatExecutorWithHook(ZenProviderKey, cfg, e.translateHook)
-	// Apply provider-specific header defaults from config.
-	if cfg != nil {
-		e.inner.SetHeaderDefaults(&cfg.ZenHeaderDefaults)
+	// Default to the request-identity headers the real opencode client sends
+	// to Zen; zen-header-defaults overrides any of them individually.
+	defaults := config.ZenHeaderDefaults{
+		HTTPReferer: zenDefaultHTTPReferer,
+		XTitle:      zenDefaultXTitle,
+		UserAgent:   zenDefaultUserAgent,
 	}
+	if cfg != nil {
+		if cfg.ZenHeaderDefaults.HTTPReferer != "" {
+			defaults.HTTPReferer = cfg.ZenHeaderDefaults.HTTPReferer
+		}
+		if cfg.ZenHeaderDefaults.XTitle != "" {
+			defaults.XTitle = cfg.ZenHeaderDefaults.XTitle
+		}
+		if cfg.ZenHeaderDefaults.UserAgent != "" {
+			defaults.UserAgent = cfg.ZenHeaderDefaults.UserAgent
+		}
+	}
+	e.inner.SetHeaderDefaults(&defaults)
 	return e
 }
 

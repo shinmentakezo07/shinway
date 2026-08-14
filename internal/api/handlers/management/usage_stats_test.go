@@ -28,7 +28,10 @@ func seedUsage(t *testing.T) {
 	records := []usagestore.Record{
 		{TS: now.Add(-2 * time.Hour), Model: "gpt-4o", Provider: "openai", APIKey: "k1", InputTokens: 100, OutputTokens: 200, TotalTokens: 300, LatencyMs: 80},
 		{TS: now.Add(-1 * time.Hour), Model: "gpt-4o", Provider: "openai", APIKey: "k1", InputTokens: 50, OutputTokens: 100, TotalTokens: 150, Failed: true, FailStatus: 500},
-		{TS: now, Model: "claude-sonnet", Provider: "anthropic", APIKey: "k2", InputTokens: 5, OutputTokens: 10, TotalTokens: 15},
+		// Kept safely inside the 24h window: the stats queries use an exclusive
+		// upper bound (ts < to), so a record stamped exactly time.Now() can be
+		// excluded when seeding and querying land in the same millisecond.
+		{TS: now.Add(-1 * time.Minute), Model: "claude-sonnet", Provider: "anthropic", APIKey: "k2", InputTokens: 5, OutputTokens: 10, TotalTokens: 15},
 	}
 	for _, r := range records {
 		if err := store.Insert(context.Background(), r); err != nil {

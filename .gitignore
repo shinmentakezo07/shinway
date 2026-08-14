@@ -64,3 +64,7 @@ _bmad-output/*
 ._*
 .gocache/
 shinway
+# Local build artifacts
+server
+# Local Claude Code settings
+clau/

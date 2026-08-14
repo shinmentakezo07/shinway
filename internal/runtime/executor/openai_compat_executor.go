@@ -81,6 +81,42 @@ func (e *OpenAICompatExecutor) resolveUserAgent() string {
 	return "cli-proxy-openai-compat"
 }
 
+// applyHeaderDefaults injects provider-specific default header values into the
+// outgoing request. Only headers not already present on the request are filled
+// in, so explicitly configured per-key headers (applied afterwards via
+// ApplyCustomHeadersFromAttrs) win. Mirrors opencode's "??=" default-header
+// semantics for providers like Zen.
+func (e *OpenAICompatExecutor) applyHeaderDefaults(r *http.Request) {
+	if r == nil || e.headerDefaults == nil {
+		return
+	}
+	if v := strings.TrimSpace(e.headerDefaults.HTTPReferer); v != "" {
+		setDefaultHeader(r, "HTTP-Referer", v)
+	}
+	if v := strings.TrimSpace(e.headerDefaults.XTitle); v != "" {
+		setDefaultHeader(r, "X-Title", v)
+	}
+}
+
+// setDefaultHeader writes name: value only when the request does not already
+// carry the header (under either its canonical or exact spelling), so
+// caller-set values take precedence over the provider default. The value is
+// stored under the canonical key so later Header.Set overrides dedupe instead
+// of producing duplicate wire headers.
+func setDefaultHeader(r *http.Request, name, value string) {
+	if r == nil {
+		return
+	}
+	canonical := http.CanonicalHeaderKey(name)
+	if _, exists := r.Header[canonical]; exists {
+		return
+	}
+	if r.Header.Get(name) != "" {
+		return
+	}
+	r.Header[canonical] = []string{value}
+}
+
 // PrepareRequest injects OpenAI-compatible credentials into the outgoing HTTP request.
 func (e *OpenAICompatExecutor) PrepareRequest(req *http.Request, auth *shinwayauth.Auth) error {
 	if req == nil {
@@ -90,6 +126,7 @@ func (e *OpenAICompatExecutor) PrepareRequest(req *http.Request, auth *shinwayau
 	if strings.TrimSpace(apiKey) != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
+	e.applyHeaderDefaults(req)
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -180,6 +217,7 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *shinwayauth.Au
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
+	e.applyHeaderDefaults(httpReq)
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -271,6 +309,7 @@ func (e *OpenAICompatExecutor) executeImages(ctx context.Context, auth *shinwaya
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
+	e.applyHeaderDefaults(httpReq)
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -385,6 +424,7 @@ func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *shinwaya
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
+	e.applyHeaderDefaults(httpReq)
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -540,6 +580,7 @@ func (e *OpenAICompatExecutor) executeImagesStream(ctx context.Context, auth *sh
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	httpReq.Header.Set("User-Agent", e.resolveUserAgent())
+	e.applyHeaderDefaults(httpReq)
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes

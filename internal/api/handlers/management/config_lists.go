@@ -1768,17 +1768,17 @@ func (h *Handler) PutZenKeys(c *gin.Context) {
 }
 func (h *Handler) PatchZenKey(c *gin.Context) {
 	type zenKeyPatch struct {
-		APIKey         *string               `json:"api-key"`
-		Priority       *int                  `json:"priority"`
-		Weight         json.RawMessage       `json:"weight"`
-		Prefix         *string               `json:"prefix"`
-		BaseURL        *string               `json:"base-url"`
-		Websockets     *bool                 `json:"websockets"`
-		ProxyURL       *string               `json:"proxy-url"`
-		Models         *[]config.ZenModel    `json:"models"`
-		Headers        *map[string]string    `json:"headers"`
-		ExcludedModels *[]string             `json:"excluded-models"`
-		DisableCooling *bool                 `json:"disable-cooling"`
+		APIKey         *string            `json:"api-key"`
+		Priority       *int               `json:"priority"`
+		Weight         json.RawMessage    `json:"weight"`
+		Prefix         *string            `json:"prefix"`
+		BaseURL        *string            `json:"base-url"`
+		Websockets     *bool              `json:"websockets"`
+		ProxyURL       *string            `json:"proxy-url"`
+		Models         *[]config.ZenModel `json:"models"`
+		Headers        *map[string]string `json:"headers"`
+		ExcludedModels *[]string          `json:"excluded-models"`
+		DisableCooling *bool              `json:"disable-cooling"`
 	}
 	var body struct {
 		Index *int         `json:"index"`

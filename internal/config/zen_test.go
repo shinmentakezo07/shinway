@@ -86,6 +86,8 @@ func TestValidateCredentialWeightsIncludesZen(t *testing.T) {
 func TestZenHeaderDefaultsParsing(t *testing.T) {
 	cfg, errParse := ParseConfigBytes([]byte(`zen-header-defaults:
   user-agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  http-referer: "https://example.com/"
+  x-title: "custom-title"
 `))
 	if errParse != nil {
 		t.Fatalf("ParseConfigBytes() error = %v", errParse)
@@ -93,6 +95,12 @@ func TestZenHeaderDefaultsParsing(t *testing.T) {
 	wantUA := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 	if got := cfg.ZenHeaderDefaults.UserAgent; got != wantUA {
 		t.Fatalf("ZenHeaderDefaults.UserAgent = %q, want %q", got, wantUA)
+	}
+	if got := cfg.ZenHeaderDefaults.HTTPReferer; got != "https://example.com/" {
+		t.Fatalf("ZenHeaderDefaults.HTTPReferer = %q, want %q", got, "https://example.com/")
+	}
+	if got := cfg.ZenHeaderDefaults.XTitle; got != "custom-title" {
+		t.Fatalf("ZenHeaderDefaults.XTitle = %q, want %q", got, "custom-title")
 	}
 }
 
@@ -103,5 +111,11 @@ func TestZenHeaderDefaultsEmpty(t *testing.T) {
 	}
 	if got := cfg.ZenHeaderDefaults.UserAgent; got != "" {
 		t.Fatalf("ZenHeaderDefaults.UserAgent = %q, want empty", got)
+	}
+	if got := cfg.ZenHeaderDefaults.HTTPReferer; got != "" {
+		t.Fatalf("ZenHeaderDefaults.HTTPReferer = %q, want empty", got)
+	}
+	if got := cfg.ZenHeaderDefaults.XTitle; got != "" {
+		t.Fatalf("ZenHeaderDefaults.XTitle = %q, want empty", got)
 	}
 }

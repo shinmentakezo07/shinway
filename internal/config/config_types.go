@@ -120,10 +120,14 @@ type CodexHeaderDefaults struct {
 
 // ZenHeaderDefaults configures default header values injected into OpenCode Zen
 // requests to help bypass upstream provider restrictions (e.g., anti-bot measures).
-// UserAgent specifies the User-Agent header; other headers can be configured
-// per-key in the zen-api-key.headers map.
+// UserAgent specifies the User-Agent header; HTTPReferer and XTitle mirror the
+// request-identity headers the real opencode client sends to Zen
+// (https://opencode.ai/ and opencode respectively). Other headers can be
+// configured per-key in the zen-api-key.headers map.
 type ZenHeaderDefaults struct {
-	UserAgent string `yaml:"user-agent" json:"user-agent"`
+	UserAgent   string `yaml:"user-agent" json:"user-agent"`
+	HTTPReferer string `yaml:"http-referer" json:"http-referer"`
+	XTitle      string `yaml:"x-title" json:"x-title"`
 }
 
 // XAIConfig configures provider-wide xAI request behavior.

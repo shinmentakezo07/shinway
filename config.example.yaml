@@ -512,10 +512,13 @@ nonstream-keepalive-interval: 0
 
 # Default headers for OpenCode Zen requests.
 # These help bypass upstream provider restrictions (e.g., anti-bot measures).
-# When configured, the User-Agent header is sent with all Zen API requests.
-# This can help avoid detection as automated traffic by upstream providers.
+# By default, Zen requests carry the same request-identity headers as the real
+# opencode client (HTTP-Referer: https://opencode.ai/, X-Title: opencode,
+# User-Agent: opencode/<version>). Override any of them here:
 # zen-header-defaults:
 #   user-agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+#   http-referer: "https://opencode.ai/"
+#   x-title: "opencode"
 
 # OpenAI compatibility providers
 # openai-compatibility:
