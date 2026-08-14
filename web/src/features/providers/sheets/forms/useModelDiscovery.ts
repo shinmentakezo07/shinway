@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { modelsApi } from '@/services/api';
 import { buildHeaderObject } from '@/utils/headers';
 import { getErrorMessage } from '@/utils/helpers';
+import { withZenIdentityHeaders } from '../../zen';
 import type { ModelInfo } from '@/utils/models';
 import type { ApiKeyEntryInput, ProviderBrand } from '../../types';
 
@@ -53,7 +54,10 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
     setLoading(true);
     setError(null);
     try {
-      const baseHeaders = buildHeaderObject(formHeaders);
+      const baseHeaders =
+        brand === 'zen'
+          ? withZenIdentityHeaders(buildHeaderObject(formHeaders))
+          : buildHeaderObject(formHeaders);
       const resolvedAuthIndex = (authIndex ?? '').trim() || undefined;
       let next: ModelInfo[] = [];
       if (brand === 'gemini') {
@@ -81,12 +85,7 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
             entryAuthIndex = entryAuthIdx;
           }
         }
-        next = await modelsApi.fetchV1ModelsViaApiCall(
-          baseUrl,
-          key,
-          baseHeaders,
-          entryAuthIndex
-        );
+        next = await modelsApi.fetchV1ModelsViaApiCall(baseUrl, key, baseHeaders, entryAuthIndex);
       } else if (brand === 'claude' || brand === 'claudeApi') {
         const key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
         next = await modelsApi.fetchClaudeModelsViaApiCall(

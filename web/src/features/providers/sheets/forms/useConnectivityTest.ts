@@ -8,6 +8,7 @@ import {
 } from '@/components/providers/utils';
 import { buildHeaderObject, hasHeader } from '@/utils/headers';
 import { getErrorMessage } from '@/utils/helpers';
+import { withZenIdentityHeaders } from '../../zen';
 import type { ApiKeyEntryInput, ModelEntryInput, ProviderBrand } from '../../types';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -228,6 +229,10 @@ export function useConnectivityTest(
           headerObj.Authorization = 'Bearer $TOKEN$';
         }
       }
+      // OpenCode Zen: send the same request-identity headers as the real
+      // opencode client (HTTP-Referer, X-Title, User-Agent). Explicit per-key
+      // headers win over the defaults.
+      const requestHeaders = brand === 'zen' ? withZenIdentityHeaders(headerObj) : headerObj;
 
       updateOpenaiStatus(idx, { state: 'loading', message: '' });
       setInFlight((n) => n + 1);
@@ -237,7 +242,7 @@ export function useConnectivityTest(
             authIndex: resolvedAuthIndex,
             method: 'POST',
             url: endpoint,
-            header: headerObj,
+            header: requestHeaders,
             data: JSON.stringify({
               model,
               messages: [{ role: 'user', content: 'Hi' }],
@@ -325,7 +330,7 @@ export function useConnectivityTest(
     }
     const hasAuthorization = hasHeader(customHeaders, 'authorization');
     const resolvedKey = explicitKey || persistedKey;
-    const resolvedAuthIndex = ((authIndex ?? '').trim() || entryAuthIndex) || undefined;
+    const resolvedAuthIndex = (authIndex ?? '').trim() || entryAuthIndex || undefined;
 
     if (!resolvedKey && !hasAuthorization && !resolvedAuthIndex) {
       setCodexStatus({ state: 'error', message: messages.apiKeyRequired });
@@ -343,6 +348,10 @@ export function useConnectivityTest(
         headerObj.Authorization = 'Bearer $TOKEN$';
       }
     }
+    // OpenCode Zen: send the same request-identity headers as the real
+    // opencode client (HTTP-Referer, X-Title, User-Agent). Explicit per-key
+    // headers win over the defaults.
+    const requestHeaders = brand === 'zen' ? withZenIdentityHeaders(headerObj) : headerObj;
 
     const payload =
       brand === 'nvidiaNim' || brand === 'zen'
@@ -366,7 +375,7 @@ export function useConnectivityTest(
           authIndex: resolvedAuthIndex,
           method: 'POST',
           url: endpoint,
-          header: headerObj,
+          header: requestHeaders,
           data: payload,
         },
         { timeout: DEFAULT_TIMEOUT_MS }

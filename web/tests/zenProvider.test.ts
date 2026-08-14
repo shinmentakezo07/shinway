@@ -4,9 +4,13 @@ import { PROVIDER_BRAND_ORDER, PROVIDER_DESCRIPTORS } from '../src/features/prov
 import {
   ZEN_AFFILIATE_URL,
   ZEN_DEFAULT_BASE_URL,
+  ZEN_DEFAULT_HTTP_REFERER,
+  ZEN_DEFAULT_USER_AGENT,
+  ZEN_DEFAULT_X_TITLE,
   ZEN_DISPLAY_NAME,
   ZEN_PROVIDER_NAME,
   extractZenEntries,
+  withZenIdentityHeaders,
 } from '../src/features/providers/zen';
 import { groupZenEntries, zenToResource } from '../src/features/providers/adapters';
 import { apiCallApi } from '../src/services/api/apiCall';
@@ -33,6 +37,46 @@ describe('OpenCode Zen provider', () => {
     expect(ZEN_DISPLAY_NAME).toBe('OpenCode Zen');
     expect(ZEN_AFFILIATE_URL).toBe('https://opencode.ai/zen');
     expect(ZEN_DEFAULT_BASE_URL).toBe('https://opencode.ai/zen/v1');
+  });
+
+  test('exposes the opencode request-identity header defaults', () => {
+    expect(ZEN_DEFAULT_HTTP_REFERER).toBe('https://opencode.ai/');
+    expect(ZEN_DEFAULT_X_TITLE).toBe('opencode');
+    expect(ZEN_DEFAULT_USER_AGENT).toBe('opencode/1.18.18');
+  });
+
+  test('withZenIdentityHeaders fills the opencode identity defaults when absent', () => {
+    const headers = withZenIdentityHeaders({ Authorization: 'Bearer oc-test' });
+    expect(headers['HTTP-Referer']).toBe('https://opencode.ai/');
+    expect(headers['X-Title']).toBe('opencode');
+    expect(headers['User-Agent']).toBe('opencode/1.18.18');
+    // Existing headers are preserved untouched.
+    expect(headers.Authorization).toBe('Bearer oc-test');
+  });
+
+  test('withZenIdentityHeaders never overrides explicitly configured headers', () => {
+    const headers = withZenIdentityHeaders({
+      'http-referer': 'https://custom.example.com/',
+      'x-title': 'my-title',
+      'user-agent': 'custom-agent/1.0',
+    });
+    // Case-insensitive: the explicitly configured lowercase keys must win and
+    // no default values may be added under any casing.
+    expect(headers['http-referer']).toBe('https://custom.example.com/');
+    expect(headers['x-title']).toBe('my-title');
+    expect(headers['user-agent']).toBe('custom-agent/1.0');
+    expect(headers['HTTP-Referer']).toBeUndefined();
+    expect(headers['X-Title']).toBeUndefined();
+    expect(headers['User-Agent']).toBeUndefined();
+  });
+
+  test('withZenIdentityHeaders does not mutate the input object', () => {
+    const input = { Authorization: 'Bearer oc-test' };
+    const headers = withZenIdentityHeaders(input);
+    expect(input['HTTP-Referer']).toBeUndefined();
+    expect(input['X-Title']).toBeUndefined();
+    expect(input['User-Agent']).toBeUndefined();
+    expect(Object.keys(headers)).toContain('HTTP-Referer');
   });
 
   test('is registered as a Quick Fill brand with a logo', () => {
@@ -171,9 +215,9 @@ describe('OpenCode Zen provider', () => {
       },
     });
 
-    useConfigStore.getState().updateConfigValue('zen-api-key', [
-      { apiKey: 'oc-new', baseUrl: ZEN_DEFAULT_BASE_URL },
-    ]);
+    useConfigStore
+      .getState()
+      .updateConfigValue('zen-api-key', [{ apiKey: 'oc-new', baseUrl: ZEN_DEFAULT_BASE_URL }]);
 
     expect(useConfigStore.getState().config?.zenApiKeys).toEqual([
       { apiKey: 'oc-new', baseUrl: ZEN_DEFAULT_BASE_URL },
