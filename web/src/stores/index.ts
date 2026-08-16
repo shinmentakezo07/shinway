@@ -13,3 +13,4 @@ export {
   commitIfQuotaCacheCurrent,
   useQuotaStore,
 } from './useQuotaStore';
+export { useUsagePrefsStore } from './useUsagePrefsStore';

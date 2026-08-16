@@ -6,13 +6,15 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useUsagePrefsStore } from '@/stores';
+import { estimateRequestCost, formatUsd } from '@/utils/modelPricing';
 import {
   usageApi,
   type UsageGroupStat,
@@ -26,6 +28,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconAlertTriangle,
   IconRefreshCw,
@@ -39,6 +42,11 @@ import {
   IconModelCluster,
   IconKey,
   IconNetwork,
+  IconPieChart,
+  IconFlame,
+  IconActivity,
+  IconScrollText,
+  IconFilterAll,
 } from '@/components/ui/icons';
 import styles from './UsagePage.module.scss';
 
@@ -66,10 +74,86 @@ function formatTs(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
+function formatShortTs(iso: string): string {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** True when the backend returned a zero-value (unbounded) timestamp. */
+function isZeroTs(iso: string): boolean {
+  if (!iso) return true;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) || d.getFullYear() < 1970;
+}
+
+/** Classify latency into a tone for the pill in the request log. */
+function latencyTone(ms: number): 'fast' | 'mid' | 'slow' {
+  if (ms < 2000) return 'fast';
+  if (ms < 8000) return 'mid';
+  return 'slow';
+}
+
 function maskKey(key: string): string {
   if (!key) return '(none)';
   if (key.length <= 8) return key;
   return `${key.slice(0, 4)}…${key.slice(-4)}`;
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// easeOutCubic for a snappy deceleration on count-ups.
+const easeOutCubic = (x: number): number => 1 - Math.pow(1 - x, 3);
+
+/**
+ * Smoothly counts a numeric stat towards its target so metric cards feel
+ * alive when data loads or the range changes. Falls back to an instant
+ * render when the user prefers reduced motion.
+ */
+function useCountUp(target: number, format: (n: number) => string): string {
+  const [display, setDisplay] = useState(() => format(0));
+  const currentRef = useRef(0);
+
+  useEffect(() => {
+    if (prefersReducedMotion() || !Number.isFinite(target)) {
+      currentRef.current = target;
+      setDisplay(format(target));
+      return;
+    }
+    const from = currentRef.current;
+    if (from === target) {
+      setDisplay(format(target));
+      return;
+    }
+    let raf = 0;
+    const duration = 700;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const value = from + (target - from) * easeOutCubic(t);
+      currentRef.current = value;
+      setDisplay(format(value));
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        currentRef.current = target;
+        setDisplay(format(target));
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+
+  return display;
 }
 
 interface BarChartProps {
@@ -138,8 +222,27 @@ function LineChart({ points, bucketSeconds, t }: LineChartProps) {
   const line = (values: number[], toY: (v: number) => number) =>
     values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
 
+  // Catmull-Rom -> cubic bezier smoothing for a softer, more organic curve.
+  const smoothLine = (values: number[], toY: (v: number) => number) => {
+    if (values.length < 3) return line(values, toY);
+    const pts = values.map((v, i) => [x(i), toY(v)] as const);
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  };
+
   const area = (values: number[], toY: (v: number) => number) =>
-    `${line(values, toY)} L${x(values.length - 1).toFixed(1)},${H - PAD_BOTTOM} L${x(0).toFixed(1)},${H - PAD_BOTTOM} Z`;
+    `${smoothLine(values, toY)} L${x(values.length - 1).toFixed(1)},${H - PAD_BOTTOM} L${x(0).toFixed(1)},${H - PAD_BOTTOM} Z`;
 
   const totals = points.map((p) => p.total_tokens);
   const inputs = points.map((p) => p.input_tokens);
@@ -196,11 +299,11 @@ function LineChart({ points, bucketSeconds, t }: LineChartProps) {
         })}
         {/* area + lines */}
         <path d={area(totals, yTokens)} fill="url(#usageAreaGradient)" stroke="none" />
-        <path d={line(totals, yTokens)} className={styles.lineTotal} fill="none" />
-        <path d={line(inputs, yTokens)} className={styles.lineInput} fill="none" />
-        <path d={line(outputs, yTokens)} className={styles.lineOutput} fill="none" />
+        <path d={smoothLine(totals, yTokens)} className={styles.lineTotal} fill="none" />
+        <path d={smoothLine(inputs, yTokens)} className={styles.lineInput} fill="none" />
+        <path d={smoothLine(outputs, yTokens)} className={styles.lineOutput} fill="none" />
         <path
-          d={line(requests, yReq)}
+          d={smoothLine(requests, yReq)}
           className={styles.lineRequests}
           fill="none"
           strokeDasharray="4 3"
@@ -301,7 +404,7 @@ function LineChart({ points, bucketSeconds, t }: LineChartProps) {
 
 interface StatCardProps {
   label: string;
-  value: string;
+  value: ReactNode;
   hint?: ReactNode;
   tone?: 'default' | 'success' | 'error' | 'info' | 'accent' | 'amber';
   icon?: ComponentType<{ size?: number }>;
@@ -322,6 +425,115 @@ function StatCard({ label, value, hint, tone = 'default', icon: Icon }: StatCard
       <div className={styles.statValue}>{value}</div>
       {hint ? <div className={styles.statHint}>{hint}</div> : null}
     </div>
+  );
+}
+
+/** Animated numeric stat value that counts up towards its target. */
+function AnimatedNumber({
+  value,
+  format,
+}: {
+  value: number;
+  format: (n: number) => string;
+}) {
+  const display = useCountUp(value, format);
+  return <>{display}</>;
+}
+
+const formatInt = (n: number): string => Math.round(n).toLocaleString();
+
+/** Card heading with a leading icon for visual rhythm across sections. */
+function SectionTitle({
+  icon: Icon,
+  children,
+}: {
+  icon: ComponentType<{ size?: number }>;
+  children: ReactNode;
+}) {
+  return (
+    <span className={styles.sectionTitle}>
+      <span className={styles.sectionTitleIcon}>
+        <Icon size={15} />
+      </span>
+      {children}
+    </span>
+  );
+}
+
+/** Numeric token breakdown (input/output/reasoning/cached) for one request. */
+function TokenNumbers({
+  input,
+  output,
+  reasoning,
+  cached,
+}: {
+  input: number;
+  output: number;
+  reasoning: number;
+  cached: number;
+}) {
+  const { t } = useTranslation();
+  const items = [
+    { key: 'input', label: t('usage.legend_input'), value: input, cls: styles.tnInput },
+    { key: 'output', label: t('usage.legend_output'), value: output, cls: styles.tnOutput },
+    { key: 'reasoning', label: t('usage.legend_reasoning'), value: reasoning, cls: styles.tnReasoning },
+    { key: 'cached', label: t('usage.legend_cached'), value: cached, cls: styles.tnCached },
+  ];
+  const sum = items.reduce((s, it) => s + Math.max(0, it.value), 0);
+  return (
+    <span className={styles.tokenNums}>
+      {sum > 0 && (
+        <span className={styles.tokenStack} aria-hidden="true">
+          {items.map((it) =>
+            it.value > 0 ? (
+              <span
+                key={it.key}
+                className={`${styles.tokenStackSeg} ${it.cls}`}
+                style={{ width: `${(Math.max(0, it.value) / sum) * 100}%` }}
+              />
+            ) : null
+          )}
+        </span>
+      )}
+      <span className={styles.tokenChips}>
+        {items.map((it) => (
+          <span
+            key={it.key}
+            className={`${styles.tokenChip} ${it.cls} ${it.value <= 0 ? styles.tokenChipZero : ''}`}
+            title={`${it.label}: ${Math.max(0, it.value).toLocaleString()}`}
+          >
+            <span className={styles.tokenChipDot} aria-hidden="true" />
+            {formatNumber(it.value)}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/** Estimated USD cost for one request, flagged when the rate is a fallback. */
+function CostCell({ record }: { record: UsageRecord }) {
+  const { t } = useTranslation();
+  const estimate = estimateRequestCost(
+    record.Model,
+    record.InputTokens,
+    record.OutputTokens,
+    record.ReasoningTokens
+  );
+  if (estimate.free) {
+    return <span className={styles.costFree}>{t('usage.cost_free')}</span>;
+  }
+  const label = `${estimate.estimated ? '~' : ''}${formatUsd(estimate.cost)}`;
+  const title = estimate.estimated
+    ? t('usage.cost_estimated_hint')
+    : t('usage.cost_hint');
+  return (
+    <span
+      className={`${styles.costValue} ${estimate.estimated ? styles.costEstimated : ''}`}
+      title={title}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -458,9 +670,10 @@ function LatencyScatter({ records }: ScatterProps) {
 
 interface HeatmapProps {
   series: UsagePoint[];
+  t: (key: string) => string;
 }
 
-function ActivityHeatmap({ series }: HeatmapProps) {
+function ActivityHeatmap({ series, t }: HeatmapProps) {
   if (!series.length) return null;
   const maxRequests = Math.max(1, ...series.map((p) => p.requests));
   const gap = 3;
@@ -492,11 +705,11 @@ function ActivityHeatmap({ series }: HeatmapProps) {
         ))}
       </div>
       <div className={styles.heatmapLegend}>
-        <span className={styles.heatLabel}>Quiet</span>
+        <span className={styles.heatLabel}>{t('usage.heatmap_quiet')}</span>
         {[0.2, 0.45, 0.7, 0.9].map((v) => (
           <div key={v} className={styles.heatLegendCell} style={{ opacity: 0.15 + 0.85 * v }} />
         ))}
-        <span className={styles.heatLabel}>Busy</span>
+        <span className={styles.heatLabel}>{t('usage.heatmap_busy')}</span>
       </div>
     </div>
   );
@@ -535,6 +748,10 @@ function SuccessRing({ rate }: SuccessRingProps) {
 export function UsagePage() {
   const { t } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const showLogCost = useUsagePrefsStore((state) => state.showLogCost);
+  const showLogTokenPie = useUsagePrefsStore((state) => state.showLogTokenPie);
+  const setShowLogCost = useUsagePrefsStore((state) => state.setShowLogCost);
+  const setShowLogTokenPie = useUsagePrefsStore((state) => state.setShowLogTokenPie);
 
   const [range, setRange] = useState<UsageRange>('24h');
   const [stats, setStats] = useState<UsageStatsResponse | null>(null);
@@ -693,14 +910,14 @@ export function UsagePage() {
           <div className={styles.statGrid}>
             <StatCard
               label={t('usage.stat_total_requests')}
-              value={formatNumber(stats.summary.total_requests)}
+              value={<AnimatedNumber value={stats.summary.total_requests} format={formatNumber} />}
               hint={`${formatNumber(stats.summary.succeeded_requests)} ${t('usage.stat_ok')}`}
               icon={IconNetwork}
               tone="info"
             />
             <StatCard
               label={t('usage.stat_failed')}
-              value={formatNumber(stats.summary.failed_requests)}
+              value={<AnimatedNumber value={stats.summary.failed_requests} format={formatInt} />}
               hint={
                 successRate >= 0 ? (
                   <span className={styles.successHint}>
@@ -714,7 +931,7 @@ export function UsagePage() {
             />
             <StatCard
               label={t('usage.stat_total_tokens')}
-              value={formatNumber(stats.summary.total_tokens)}
+              value={<AnimatedNumber value={stats.summary.total_tokens} format={formatNumber} />}
               hint={
                 <span className={styles.tokBreakdown}>
                   <span className={styles.tokIn}>
@@ -731,19 +948,21 @@ export function UsagePage() {
             />
             <StatCard
               label={t('usage.stat_cached')}
-              value={formatNumber(stats.summary.total_cached_tokens)}
+              value={<AnimatedNumber value={stats.summary.total_cached_tokens} format={formatNumber} />}
               hint={t('usage.stat_cached_hint')}
               icon={IconCheckCircle2}
               tone="success"
             />
             <StatCard
               label={t('usage.stat_reasoning')}
-              value={formatNumber(stats.summary.total_reasoning_tokens)}
+              value={
+                <AnimatedNumber value={stats.summary.total_reasoning_tokens} format={formatNumber} />
+              }
               icon={IconBot}
             />
             <StatCard
               label={t('usage.stat_avg_latency')}
-              value={formatMs(stats.summary.avg_latency_ms)}
+              value={<AnimatedNumber value={stats.summary.avg_latency_ms} format={formatMs} />}
               hint={
                 <span className={styles.ttftPill}>TTFT {formatMs(stats.summary.avg_ttft_ms)}</span>
               }
@@ -752,19 +971,29 @@ export function UsagePage() {
             />
             <StatCard
               label={t('usage.stat_models')}
-              value={String(stats.summary.unique_models)}
+              value={<AnimatedNumber value={stats.summary.unique_models} format={formatInt} />}
               icon={IconModelCluster}
             />
             <StatCard
               label={t('usage.stat_api_keys')}
-              value={String(stats.summary.unique_api_keys)}
+              value={<AnimatedNumber value={stats.summary.unique_api_keys} format={formatInt} />}
               hint={`${stats.summary.unique_auth_files} ${t('usage.stat_auths')}`}
               icon={IconKey}
             />
           </div>
 
           {/* Time-series chart */}
-          <Card title={t('usage.chart_title')} className={styles.glassCard}>
+          <Card
+            title={<SectionTitle icon={IconChart}>{t('usage.chart_title')}</SectionTitle>}
+            className={styles.glassCard}
+            extra={
+              <span className={styles.windowNote}>
+                {isZeroTs(stats.summary.from) || isZeroTs(stats.summary.to)
+                  ? t('usage.range_all')
+                  : `${formatShortTs(stats.summary.from)} → ${formatShortTs(stats.summary.to)}`}
+              </span>
+            }
+          >
             {stats.series && stats.series.length > 0 ? (
               <LineChart points={stats.series} bucketSeconds={stats.bucket_seconds} t={t} />
             ) : (
@@ -774,7 +1003,10 @@ export function UsagePage() {
 
           {/* Diagram wall: composition donut, request activity heatmap, latency scatter */}
           <div className={styles.vizGrid}>
-            <Card title={t('usage.donut_title')}>
+            <Card
+              title={<SectionTitle icon={IconPieChart}>{t('usage.donut_title')}</SectionTitle>}
+              className={styles.glassCard}
+            >
               <DonutChart
                 segments={[
                   {
@@ -802,14 +1034,20 @@ export function UsagePage() {
                 centerValue={formatNumber(stats.summary.total_tokens)}
               />
             </Card>
-            <Card title={t('usage.heatmap_title')}>
+            <Card
+              title={<SectionTitle icon={IconFlame}>{t('usage.heatmap_title')}</SectionTitle>}
+              className={styles.glassCard}
+            >
               {stats.series && stats.series.length > 0 ? (
-                <ActivityHeatmap series={stats.series} />
+                <ActivityHeatmap series={stats.series} t={t} />
               ) : (
                 <EmptyState title={t('usage.no_data')} />
               )}
             </Card>
-            <Card title={t('usage.scatter_title')} className={styles.vizGridWide}>
+            <Card
+              title={<SectionTitle icon={IconActivity}>{t('usage.scatter_title')}</SectionTitle>}
+              className={`${styles.glassCard} ${styles.vizGridWide}`}
+            >
               {records.length > 0 ? (
                 <LatencyScatter records={records} />
               ) : (
@@ -820,7 +1058,7 @@ export function UsagePage() {
 
           {/* Per-dimension breakdown */}
           <Card
-            title={t('usage.breakdown_title')}
+            title={<SectionTitle icon={IconFilterAll}>{t('usage.breakdown_title')}</SectionTitle>}
             className={styles.glassCard}
             extra={
               <div className={styles.rangeButtons}>
@@ -889,7 +1127,14 @@ export function UsagePage() {
 
           {/* Request log */}
           <Card
-            title={t('usage.records_title')}
+            title={
+              <SectionTitle icon={IconScrollText}>
+                {t('usage.records_title')}
+                {recordsTotal > 0 && (
+                  <span className={styles.countBadge}>{formatNumber(recordsTotal)}</span>
+                )}
+              </SectionTitle>
+            }
             className={styles.glassCard}
             extra={
               <div className={styles.recordsControls}>
@@ -909,6 +1154,19 @@ export function UsagePage() {
                   />
                   {t('usage.failed_only')}
                 </label>
+                <span className={styles.metricsDivider} aria-hidden="true" />
+                <ToggleSwitch
+                  checked={showLogCost}
+                  onChange={setShowLogCost}
+                  label={t('usage.show_cost')}
+                  ariaLabel={t('usage.show_cost')}
+                />
+                <ToggleSwitch
+                  checked={showLogTokenPie}
+                  onChange={setShowLogTokenPie}
+                  label={t('usage.show_token_pie')}
+                  ariaLabel={t('usage.show_token_pie')}
+                />
               </div>
             }
           >
@@ -931,6 +1189,7 @@ export function UsagePage() {
                         <th>{t('usage.col_key')}</th>
                         <th>{t('usage.col_endpoint')}</th>
                         <th>{t('usage.col_tokens')}</th>
+                        {showLogCost && <th>{t('usage.col_cost')}</th>}
                         <th>{t('usage.col_latency')}</th>
                         <th>{t('usage.col_status')}</th>
                       </tr>
@@ -962,10 +1221,29 @@ export function UsagePage() {
                               className={styles.tokensCell}
                               title={`in ${r.InputTokens} · out ${r.OutputTokens} · reasoning ${r.ReasoningTokens} · cached ${r.CachedTokens}`}
                             >
-                              {formatNumber(r.TotalTokens)}
+                              <span className={styles.tokensValue}>{formatNumber(r.TotalTokens)}</span>
+                              {showLogTokenPie && (
+                                <TokenNumbers
+                                  input={r.InputTokens}
+                                  output={r.OutputTokens}
+                                  reasoning={r.ReasoningTokens}
+                                  cached={r.CachedTokens}
+                                />
+                              )}
                             </span>
                           </td>
-                          <td>{formatMs(r.LatencyMs)}</td>
+                          {showLogCost && (
+                            <td>
+                              <CostCell record={r} />
+                            </td>
+                          )}
+                          <td>
+                            <span
+                              className={`${styles.latencyPill} ${styles[`latency-${latencyTone(r.LatencyMs)}`]}`}
+                            >
+                              {formatMs(r.LatencyMs)}
+                            </span>
+                          </td>
                           <td>
                             {r.Failed ? (
                               <span className={styles.statusFail} title={r.FailBody}>

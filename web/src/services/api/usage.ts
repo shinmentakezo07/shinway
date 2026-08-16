@@ -116,15 +116,30 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   return qs.toString();
 }
 
+/**
+ * Maps the UI range shorthand to query params. The backend treats a missing
+ * from/to (and no `range`) as "all time", and rejects `range=all` as an
+ * invalid duration, so the all-time option must omit the param entirely.
+ */
+export function usageRangeQuery(range: UsageRange | undefined): { range?: string } {
+  if (!range || range === 'all') return {};
+  return { range };
+}
+
 export const usageApi = {
   getStats: (range: UsageRange = '24h') =>
-    apiClient.get<UsageStatsResponse>(`/usage-stats?${buildQuery({ range })}`, {
+    apiClient.get<UsageStatsResponse>(`/usage-stats?${buildQuery(usageRangeQuery(range))}`, {
       timeout: USAGE_TIMEOUT_MS,
     }),
-  getRecords: (params: UsageRecordsParams = {}) =>
-    apiClient.get<UsageRecordsResponse>(`/usage-records?${buildQuery(params as Record<string, string | number | boolean | undefined>)}`, {
-      timeout: USAGE_TIMEOUT_MS,
-    }),
+  getRecords: (params: UsageRecordsParams = {}) => {
+    const { range, ...rest } = params;
+    return apiClient.get<UsageRecordsResponse>(
+      `/usage-records?${buildQuery({ ...usageRangeQuery(range), ...rest } as Record<string, string | number | boolean | undefined>)}`,
+      {
+        timeout: USAGE_TIMEOUT_MS,
+      }
+    );
+  },
   purge: (beforeMs: number) =>
     apiClient.delete<{ deleted: number }>(`/usage-records?${buildQuery({ before: beforeMs })}`, {
       timeout: USAGE_TIMEOUT_MS,
