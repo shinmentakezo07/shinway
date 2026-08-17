@@ -147,6 +147,9 @@ const NVIDIAProviderBaseURL = "https://integrate.api.nvidia.com/v1"
 // ZenProviderBaseURL is the canonical OpenAI-compatible base URL for OpenCode Zen.
 const ZenProviderBaseURL = "https://opencode.ai/zen/v1"
 
+// TokenRouterProviderBaseURL is the canonical OpenAI-compatible base URL for TokenRouter.
+const TokenRouterProviderBaseURL = "https://api.tokenrouter.com/v1"
+
 // SanitizeNVIDIAKeys normalizes NVIDIA NIM API key entries.
 // Empty BaseURL is defaulted to the hosted NIM endpoint so users can leave it blank
 // in the Quick Fill UI.
@@ -177,6 +180,22 @@ func (cfg *Config) SanitizeZenKeys() {
 		}
 	}
 	cfg.ZenKey = sanitizeCodexKeyEntries(cfg.ZenKey)
+}
+
+// SanitizeTokenRouterKeys normalizes TokenRouter API key entries.
+// Empty BaseURL is defaulted to the hosted TokenRouter endpoint so users can leave
+// it blank in the Quick Fill UI.
+func (cfg *Config) SanitizeTokenRouterKeys() {
+	if cfg == nil {
+		return
+	}
+	for i := range cfg.TokenRouterKey {
+		cfg.TokenRouterKey[i].BaseURL = strings.TrimSpace(cfg.TokenRouterKey[i].BaseURL)
+		if cfg.TokenRouterKey[i].BaseURL == "" {
+			cfg.TokenRouterKey[i].BaseURL = TokenRouterProviderBaseURL
+		}
+	}
+	cfg.TokenRouterKey = sanitizeCodexKeyEntries(cfg.TokenRouterKey)
 }
 
 func sanitizeCodexKeyEntries(entries []CodexKey) []CodexKey {

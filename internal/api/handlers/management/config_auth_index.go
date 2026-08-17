@@ -38,6 +38,11 @@ type zenKeyWithAuthIndex struct {
 	AuthIndex string `json:"auth-index,omitempty"`
 }
 
+type tokenRouterKeyWithAuthIndex struct {
+	config.TokenRouterKey
+	AuthIndex string `json:"auth-index,omitempty"`
+}
+
 type vertexCompatKeyWithAuthIndex struct {
 	config.VertexCompatKey
 	AuthIndex string `json:"auth-index,omitempty"`
@@ -291,6 +296,35 @@ func (h *Handler) zenKeysWithAuthIndex() []zenKeyWithAuthIndex {
 		out[i] = zenKeyWithAuthIndex{
 			ZenKey:    entry,
 			AuthIndex: authIndex,
+		}
+	}
+	return out
+}
+
+func (h *Handler) tokenRouterKeysWithAuthIndex() []tokenRouterKeyWithAuthIndex {
+	if h == nil {
+		return nil
+	}
+	liveIndexByID := h.liveAuthIndexByID()
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.cfg == nil {
+		return nil
+	}
+
+	idGen := synthesizer.NewStableIDGenerator()
+	out := make([]tokenRouterKeyWithAuthIndex, len(h.cfg.TokenRouterKey))
+	for i := range h.cfg.TokenRouterKey {
+		entry := h.cfg.TokenRouterKey[i]
+		authIndex := ""
+		if key := strings.TrimSpace(entry.APIKey); key != "" {
+			id, _ := idGen.Next("tokenrouter:apikey", key, entry.BaseURL)
+			authIndex = liveIndexByID[id]
+		}
+		out[i] = tokenRouterKeyWithAuthIndex{
+			TokenRouterKey: entry,
+			AuthIndex:      authIndex,
 		}
 	}
 	return out

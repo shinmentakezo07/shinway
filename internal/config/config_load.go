@@ -168,6 +168,9 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// Sanitize OpenCode Zen keys: default empty base-url to the hosted endpoint
 	cfg.SanitizeZenKeys()
 
+	// Sanitize TokenRouter keys: default empty base-url to the hosted endpoint
+	cfg.SanitizeTokenRouterKeys()
+
 	// Sanitize Codex header defaults.
 	cfg.SanitizeCodexHeaderDefaults()
 

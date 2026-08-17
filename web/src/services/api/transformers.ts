@@ -371,6 +371,13 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
       .filter(Boolean) as ProviderKeyConfig[];
   }
 
+  const tokenRouterList = raw['tokenrouter-api-key'];
+  if (Array.isArray(tokenRouterList)) {
+    config.tokenRouterApiKeys = tokenRouterList
+      .map((item) => normalizeProviderKeyConfig(item))
+      .filter(Boolean) as ProviderKeyConfig[];
+  }
+
   const claudeList = raw['claude-api-key'];
   if (Array.isArray(claudeList)) {
     config.claudeApiKeys = claudeList

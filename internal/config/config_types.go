@@ -512,6 +512,12 @@ type ZenKey = CodexKey
 // ZenModel uses the Codex model mapping structure for OpenCode Zen models.
 type ZenModel = CodexModel
 
+// TokenRouterKey uses the Codex API key structure for native TokenRouter execution.
+type TokenRouterKey = CodexKey
+
+// TokenRouterModel uses the Codex model mapping structure for TokenRouter models.
+type TokenRouterModel = CodexModel
+
 // NVIDIAConfig configures provider-wide NVIDIA NIM request behavior.
 type NVIDIAConfig struct {
 	// DefaultThinking controls whether requests without an explicit thinking suffix or

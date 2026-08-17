@@ -12,6 +12,7 @@ export const MODEL_DISCOVERY_BRANDS: ReadonlyArray<ProviderBrand> = [
   'xai',
   'nvidiaNim',
   'zen',
+  'tokenRouter',
   'claude',
   'claudeApi',
   'openaiCompatibility',
@@ -68,10 +69,16 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           baseHeaders,
           resolvedAuthIndex
         );
-      } else if (brand === 'codex' || brand === 'xai' || brand === 'nvidiaNim' || brand === 'zen') {
+      } else if (
+        brand === 'codex' ||
+        brand === 'xai' ||
+        brand === 'nvidiaNim' ||
+        brand === 'zen' ||
+        brand === 'tokenRouter'
+      ) {
         let key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
         let entryAuthIndex = resolvedAuthIndex;
-        if (brand === 'nvidiaNim' || brand === 'zen') {
+        if (brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter') {
           const firstEntry = (apiKeyEntries ?? []).find(
             (entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim()
           );

@@ -31,6 +31,7 @@ import styles from './sharedForm.module.scss';
 import { CLAUDE_API_BASE_URL } from '../../claudeApi';
 import { NVIDIA_NIM_DEFAULT_BASE_URL } from '../../nvidiaNim';
 import { ZEN_DEFAULT_BASE_URL } from '../../zen';
+import { TOKEN_ROUTER_DEFAULT_BASE_URL } from '../../tokenRouter';
 
 interface BaseProviderFormProps {
   brand: ProviderBrand;
@@ -79,7 +80,9 @@ function buildInitialForm(
               ? NVIDIA_NIM_DEFAULT_BASE_URL
               : brand === 'zen'
                 ? ZEN_DEFAULT_BASE_URL
-                : '',
+                : brand === 'tokenRouter'
+                  ? TOKEN_ROUTER_DEFAULT_BASE_URL
+                  : '',
       proxyUrl: '',
       prefix: '',
       disabled: false,
@@ -99,12 +102,16 @@ function buildInitialForm(
         brand === 'xai' ||
         brand === 'nvidiaNim' ||
         brand === 'zen' ||
+        brand === 'tokenRouter' ||
         isClaudeLikeBrand(brand) ||
         brand === 'gemini'
           ? ''
           : undefined,
       apiKeyEntries:
-        brand === 'openaiCompatibility' || brand === 'nvidiaNim' || brand === 'zen'
+        brand === 'openaiCompatibility' ||
+        brand === 'nvidiaNim' ||
+        brand === 'zen' ||
+        brand === 'tokenRouter'
           ? [emptyApiKeyEntry()]
           : undefined,
     };
@@ -148,7 +155,7 @@ function buildInitialForm(
     };
   }
 
-  if (brand === 'nvidiaNim' || brand === 'zen') {
+  if (brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter') {
     const cfg = raw as ProviderKeyConfig;
     const disabled = hasDisableAllModelsRule(cfg.excludedModels);
     const excludedList = stripDisableAllRule(cfg.excludedModels);
@@ -480,11 +487,16 @@ export function BaseProviderForm({
     brand === 'xai' ||
     brand === 'nvidiaNim' ||
     brand === 'zen' ||
+    brand === 'tokenRouter' ||
     isClaudeLikeBrand(brand) ||
     brand === 'openaiCompatibility';
   const supportsOpenAIModelOptions = brand === 'openaiCompatibility';
   const singleConnectivity =
-    brand === 'codex' || brand === 'xai' || brand === 'nvidiaNim' || brand === 'zen'
+    brand === 'codex' ||
+    brand === 'xai' ||
+    brand === 'nvidiaNim' ||
+    brand === 'zen' ||
+    brand === 'tokenRouter'
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
       : brand === 'gemini'
         ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
@@ -653,6 +665,7 @@ export function BaseProviderForm({
               brand === 'xai' ||
               brand === 'nvidiaNim' ||
               brand === 'zen' ||
+              brand === 'tokenRouter' ||
               isClaudeLikeBrand(brand) ||
               brand === 'gemini' ? (
                 <span className={styles.labelHint}>

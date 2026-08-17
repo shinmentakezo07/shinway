@@ -16,6 +16,7 @@ const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = [
   'claudeApi',
   'nvidiaNim',
   'zen',
+  'tokenRouter',
 ];
 
 const QUICK_FILL_BRANDS: ReadonlySet<ProviderBrand> = new Set(QUICK_FILL_BRAND_ORDER);

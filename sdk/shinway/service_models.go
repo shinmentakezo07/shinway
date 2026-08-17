@@ -180,6 +180,20 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
 			}
 		}
 		models = applyExcludedModels(models, excluded)
+	case "tokenrouter":
+		// TokenRouter has no curated builtin catalog: models are always derived
+		// from the user's config (Quick Fill fetches them from /models at
+		// https://api.tokenrouter.com/v1). This keeps the registry truthful
+		// about which model IDs are actually reachable for a given key.
+		if entry := s.resolveConfigTokenRouterKey(a); entry != nil {
+			if len(entry.Models) > 0 {
+				models = buildTokenRouterConfigModels(entry)
+			}
+			if authKind == "apikey" {
+				excluded = entry.ExcludedModels
+			}
+		}
+		models = applyExcludedModels(models, excluded)
 	default:
 		// Handle OpenAI-compatibility providers by name using config
 		if s.cfg != nil {
@@ -507,6 +521,13 @@ func (s *Service) resolveConfigZenKey(auth *coreauth.Auth) *config.ZenKey {
 		return nil
 	}
 	return resolveConfigCodexStyleKey(auth, s.cfg.ZenKey)
+}
+
+func (s *Service) resolveConfigTokenRouterKey(auth *coreauth.Auth) *config.TokenRouterKey {
+	if s == nil || s.cfg == nil {
+		return nil
+	}
+	return resolveConfigCodexStyleKey(auth, s.cfg.TokenRouterKey)
 }
 
 func resolveConfigCodexStyleKey(auth *coreauth.Auth, entries []config.CodexKey) *config.CodexKey {
@@ -871,6 +892,13 @@ func buildZenConfigModels(entry *config.ZenKey) []*ModelInfo {
 		return nil
 	}
 	return buildConfigModels(entry.Models, "opencode", "zen")
+}
+
+func buildTokenRouterConfigModels(entry *config.TokenRouterKey) []*ModelInfo {
+	if entry == nil {
+		return nil
+	}
+	return buildConfigModels(entry.Models, "tokenrouter", "tokenrouter")
 }
 
 func buildCodexConfigModels(entry *config.CodexKey) []*ModelInfo {

@@ -56,6 +56,8 @@ func (s *ConfigSynthesizer) Synthesize(ctx *SynthesisContext) ([]*coreauth.Auth,
 	out = append(out, s.synthesizeNVIDIAKeys(ctx)...)
 	// OpenCode Zen API Keys
 	out = append(out, s.synthesizeZenKeys(ctx)...)
+	// TokenRouter API Keys
+	out = append(out, s.synthesizeTokenRouterKeys(ctx)...)
 	// OpenAI-compat
 	out = append(out, s.synthesizeOpenAICompat(ctx)...)
 	// Vertex-compat
@@ -208,6 +210,11 @@ func (s *ConfigSynthesizer) synthesizeNVIDIAKeys(ctx *SynthesisContext) []*corea
 // synthesizeZenKeys creates Auth entries for OpenCode Zen API keys.
 func (s *ConfigSynthesizer) synthesizeZenKeys(ctx *SynthesisContext) []*coreauth.Auth {
 	return s.synthesizeCodexStyleKeys(ctx, ctx.Config.ZenKey, "zen")
+}
+
+// synthesizeTokenRouterKeys creates Auth entries for TokenRouter API keys.
+func (s *ConfigSynthesizer) synthesizeTokenRouterKeys(ctx *SynthesisContext) []*coreauth.Auth {
+	return s.synthesizeCodexStyleKeys(ctx, ctx.Config.TokenRouterKey, "tokenrouter")
 }
 
 func (s *ConfigSynthesizer) synthesizeCodexStyleKeys(ctx *SynthesisContext, entries []config.CodexKey, provider string) []*coreauth.Auth {

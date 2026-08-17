@@ -7,6 +7,7 @@ import { getKimiAffiliateUrl } from '../kimi';
 import { APIKEY_FUN_AFFILIATE_URL, APIKEY_FUN_DASHBOARD_URL } from '../sponsor';
 import { NVIDIA_NIM_AFFILIATE_URL } from '../nvidiaNim';
 import { ZEN_AFFILIATE_URL } from '../zen';
+import { TOKEN_ROUTER_AFFILIATE_URL } from '../tokenRouter';
 import { getSponsorProviderDefinition } from '../sponsorDefinitions';
 import type { ProviderGroup, ProviderResource } from '../types';
 import { ProviderResourceTable } from './ProviderResourceTable';
@@ -73,7 +74,9 @@ export function ProviderResourcePanel({
         ? NVIDIA_NIM_AFFILIATE_URL
         : group.id === 'zen'
           ? ZEN_AFFILIATE_URL
-          : null;
+          : group.id === 'tokenRouter'
+            ? TOKEN_ROUTER_AFFILIATE_URL
+            : null;
   const registrationLabel = t(
     group.id === 'kimi' ? 'providersPage.sponsor.registerNow' : 'providersPage.sponsor.registerLink'
   );

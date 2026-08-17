@@ -180,7 +180,13 @@ export function useConnectivityTest(
 
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
-      if (brand !== 'openaiCompatibility' && brand !== 'nvidiaNim' && brand !== 'zen') return false;
+      if (
+        brand !== 'openaiCompatibility' &&
+        brand !== 'nvidiaNim' &&
+        brand !== 'zen' &&
+        brand !== 'tokenRouter'
+      )
+        return false;
 
       const trimmedBase = baseUrl.trim();
       if (!trimmedBase) {
@@ -281,14 +287,27 @@ export function useConnectivityTest(
   );
 
   const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility' && brand !== 'nvidiaNim' && brand !== 'zen') return;
+    if (
+      brand !== 'openaiCompatibility' &&
+      brand !== 'nvidiaNim' &&
+      brand !== 'zen' &&
+      brand !== 'tokenRouter'
+    )
+      return;
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));
   }, [apiKeyEntries, brand, runOpenAIKey]);
 
   const runCodex = useCallback(async (): Promise<void> => {
-    if (brand !== 'codex' && brand !== 'xai' && brand !== 'nvidiaNim' && brand !== 'zen') return;
+    if (
+      brand !== 'codex' &&
+      brand !== 'xai' &&
+      brand !== 'nvidiaNim' &&
+      brand !== 'zen' &&
+      brand !== 'tokenRouter'
+    )
+      return;
 
     const trimmedBase = baseUrl.trim();
     if (!trimmedBase) {
@@ -296,9 +315,10 @@ export function useConnectivityTest(
       return;
     }
 
-    // NVIDIA NIM / OpenCode Zen expose OpenAI chat-completions, Codex/xAI use the Responses API.
+    // NVIDIA NIM / OpenCode Zen / TokenRouter expose OpenAI chat-completions,
+    // Codex/xAI use the Responses API.
     const endpoint =
-      brand === 'nvidiaNim' || brand === 'zen'
+      brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter'
         ? buildOpenAIChatCompletionsEndpoint(trimmedBase)
         : buildCodexResponsesEndpoint(trimmedBase);
     if (!endpoint) {
@@ -316,7 +336,7 @@ export function useConnectivityTest(
     let explicitKey = (apiKey ?? '').trim();
     let persistedKey = (fallbackApiKey ?? '').trim();
     let entryAuthIndex = '';
-    if (brand === 'nvidiaNim' || brand === 'zen') {
+    if (brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter') {
       const firstEntry = (apiKeyEntries ?? []).find(
         (entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim()
       );
@@ -354,7 +374,7 @@ export function useConnectivityTest(
     const requestHeaders = brand === 'zen' ? withZenIdentityHeaders(headerObj) : headerObj;
 
     const payload =
-      brand === 'nvidiaNim' || brand === 'zen'
+      brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter'
         ? JSON.stringify({
             model,
             messages: [{ role: 'user', content: 'Hi' }],

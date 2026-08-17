@@ -40,6 +40,10 @@ You can access the following providers locally and with multiple CLI accounts th
         <td align="center"><a href="https://opencode.ai/zen"><img src="./web/src/assets/icons/opencode.svg" alt="OpenCode Zen" width="28" height="28" /></a></td>
         <td><a href="https://opencode.ai/zen">OpenCode Zen</a> curated models (GLM, DeepSeek, Kimi, MiniMax, free promo models, and more). Zen is a tested and verified OpenAI-compatible gateway from the OpenCode team served at <code>https://opencode.ai/zen/v1/chat/completions</code>. shinway treats it as a first-class OpenAI-compatible provider: multi-key round-robin, per-key base URL/prefix/proxy overrides, model aliasing, reasoning via <code>reasoning_effort</code>, and model discovery from <code>/models</code>. Get an API key from <a href="https://opencode.ai/auth">opencode.ai/auth</a>; the default base URL is <code>https://opencode.ai/zen/v1</code>. Only the chat-completions-served model families (GLM, DeepSeek, Kimi, MiniMax, free promo models) are supported — Zen's GPT/Claude/Qwen/Gemini families use different endpoint shapes and are not routed through this provider.</td>
     </tr>
+    <tr>
+        <td align="center"><a href="https://www.tokenrouter.com"><img src="./web/src/assets/icons/tokenrouter.svg" alt="TokenRouter" width="28" height="28" /></a></td>
+        <td><a href="https://www.tokenrouter.com">TokenRouter</a> unified multi-model gateway (Claude, GPT, Gemini, DeepSeek, Kimi, Qwen, GLM, and more). TokenRouter is a fully OpenAI-compatible gateway served at <code>https://api.tokenrouter.com/v1/chat/completions</code>: one API key and one base URL route to 50+ upstream models whose IDs carry a provider prefix (e.g. <code>anthropic/claude-sonnet-4.6</code>, <code>deepseek/deepseek-v4-pro-0813</code>). shinway treats it as a first-class OpenAI-compatible provider: multi-key round-robin, per-key base URL/prefix/proxy overrides, model aliasing, reasoning via <code>reasoning_effort</code>, and model discovery from <code>/models</code>. Get an API key from the <a href="https://www.tokenrouter.com/console/token">TokenRouter console</a>; the default base URL is <code>https://api.tokenrouter.com/v1</code>.</td>
+    </tr>
 </tbody>
 </table>
 
@@ -128,6 +132,7 @@ PackyCode provides special discounts for our software users: register using <a h
 - OpenAI-compatible upstream providers via config (e.g., OpenRouter)
 - NVIDIA NIM hosted models via config (DeepSeek, MiniMax, Kimi, Inkling, and more) with per-model-family reasoning profile mapping
 - OpenCode Zen curated models via config (GLM, DeepSeek, Kimi, MiniMax, free promo models, and more) with multi-key round-robin and reasoning support
+- TokenRouter unified multi-model gateway via config (Claude, GPT, Gemini, DeepSeek, Kimi, Qwen, GLM, and more) with multi-key round-robin and reasoning support
 - Reusable Go SDK for embedding the proxy (see `docs/sdk-usage.md`)
 
 ## Getting Started

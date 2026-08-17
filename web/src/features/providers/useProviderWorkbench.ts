@@ -24,9 +24,11 @@ import {
   geminiToResource,
   groupNvidiaEntries,
   groupZenEntries,
+  groupTokenRouterEntries,
   nvidiaToResource,
   openaiToResource,
   zenToResource,
+  tokenRouterToResource,
   qiniuCloudToResource,
   kimiToResource,
   vertexToResource,
@@ -155,7 +157,7 @@ const buildModelAliases = (
     .filter((m) => m.name);
 
 const buildProviderKeyConfig = (
-  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'zen' | 'claude' | 'vertex',
+  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'zen' | 'tokenRouter' | 'claude' | 'vertex',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | GeminiKeyConfig | null
 ): ProviderKeyConfig | GeminiKeyConfig => {
@@ -364,7 +366,7 @@ const toggleSponsorConfig = async (raw: SponsorProviderRaw, disabled: boolean) =
 };
 
 const buildMultiKeyProviderConfig = (
-  brand: 'nvidiaNim' | 'zen',
+  brand: 'nvidiaNim' | 'zen' | 'tokenRouter',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | null
 ): ProviderKeyConfig => {
@@ -399,6 +401,11 @@ const buildZenConfig = (
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | null
 ): ProviderKeyConfig => buildMultiKeyProviderConfig('zen', input, existing);
+
+const buildTokenRouterConfig = (
+  input: ProviderEntryFormInput,
+  existing?: ProviderKeyConfig | null
+): ProviderKeyConfig => buildMultiKeyProviderConfig('tokenRouter', input, existing);
 
 /* -------------------------------------------------------------------------- */
 /* hook                                                                       */
@@ -519,6 +526,23 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               ...resource,
               selector: {
                 brand: 'zen',
+                apiKey: firstEntry?.apiKey ?? '',
+                baseUrl: group.raw.baseUrl,
+                index: primaryIndex,
+                indices: group.indices,
+              },
+            };
+          });
+          break;
+        case 'tokenRouter':
+          resources = groupTokenRouterEntries(config).map((group, groupIndex) => {
+            const primaryIndex = group.indices[0] ?? groupIndex;
+            const resource = tokenRouterToResource(group.raw, primaryIndex);
+            const firstEntry = group.raw.apiKeyEntries?.[0];
+            return {
+              ...resource,
+              selector: {
+                brand: 'tokenRouter',
                 apiKey: firstEntry?.apiKey ?? '',
                 baseUrl: group.raw.baseUrl,
                 index: primaryIndex,
@@ -763,6 +787,18 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               apiKeyEntries: undefined,
             });
           }
+        } else if (brand === 'tokenRouter') {
+          const built = buildTokenRouterConfig(input);
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const entry = built.apiKeyEntries?.[i];
+            await providersApi.createTokenRouterConfig({
+              ...built,
+              apiKey: entry?.apiKey ?? built.apiKey ?? '',
+              proxyUrl: entry?.proxyUrl ?? built.proxyUrl,
+              apiKeyEntries: undefined,
+            });
+          }
         } else if (brand === 'claude') {
           await providersApi.createClaudeConfig(
             buildProviderKeyConfig('claude', input) as ProviderKeyConfig
@@ -869,6 +905,31 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               });
             }
           }
+        } else if (brand === 'tokenRouter' && selector.brand === 'tokenRouter') {
+          const existing = resource.raw as ProviderKeyConfig;
+          const built = buildTokenRouterConfig(input, existing);
+          const oldIndices = selector.indices ?? [selector.index];
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, oldIndices.length, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const oldIndex = oldIndices[i];
+            const oldConfig = config?.tokenRouterApiKeys?.[oldIndex];
+            const entry = built.apiKeyEntries?.[i];
+            if (oldConfig && entry) {
+              await providersApi.updateTokenRouterConfig(oldConfig.apiKey, oldConfig.baseUrl, {
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            } else if (oldConfig && !entry) {
+              await providersApi.deleteTokenRouterConfig(oldConfig.apiKey, oldConfig.baseUrl);
+            } else if (entry) {
+              await providersApi.createTokenRouterConfig({
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            }
+          }
         } else if (brand === 'claude' && selector.brand === 'claude') {
           const existing = resource.raw as ProviderKeyConfig;
           await providersApi.updateClaudeConfig(
@@ -949,6 +1010,16 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           }
           const next = (config?.zenApiKeys ?? []).filter((_, i) => !indices.includes(i));
           updateConfigValue('zen-api-key', next);
+        } else if (sel.brand === 'tokenRouter') {
+          const indices = sel.indices ?? [sel.index];
+          const configs = indices
+            .map((i) => config?.tokenRouterApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            await providersApi.deleteTokenRouterConfig(cfg.apiKey, cfg.baseUrl);
+          }
+          const next = (config?.tokenRouterApiKeys ?? []).filter((_, i) => !indices.includes(i));
+          updateConfigValue('tokenrouter-api-key', next);
         } else if (sel.brand === 'claude') {
           await providersApi.deleteClaudeConfig(sel.apiKey, sel.baseUrl);
           const next = (config?.claudeApiKeys ?? []).filter((_, i) => i !== sel.index);
@@ -1061,6 +1132,20 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               ? withDisableAllModelsRule(cfg.excludedModels)
               : withoutDisableAllModelsRule(cfg.excludedModels);
             await providersApi.updateZenConfig(cfg.apiKey, cfg.baseUrl, {
+              ...cfg,
+              excludedModels,
+            });
+          }
+        } else if (brand === 'tokenRouter' && selector.brand === 'tokenRouter') {
+          const indices = selector.indices ?? [selector.index];
+          const configs = indices
+            .map((i) => config?.tokenRouterApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            const excludedModels = disabled
+              ? withDisableAllModelsRule(cfg.excludedModels)
+              : withoutDisableAllModelsRule(cfg.excludedModels);
+            await providersApi.updateTokenRouterConfig(cfg.apiKey, cfg.baseUrl, {
               ...cfg,
               excludedModels,
             });

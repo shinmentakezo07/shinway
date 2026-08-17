@@ -34,6 +34,7 @@ import {
 } from './kimi';
 import { NVIDIA_NIM_DISPLAY_NAME } from './nvidiaNim';
 import { ZEN_DISPLAY_NAME } from './zen';
+import { TOKEN_ROUTER_DISPLAY_NAME } from './tokenRouter';
 import type {
   ProviderBrand,
   ProviderResource,
@@ -74,6 +75,7 @@ function providerKeyToResource(
     | 'xai'
     | 'nvidiaNim'
     | 'zen'
+    | 'tokenRouter'
     | 'claude'
     | 'claudeApi'
     | 'vertex',
@@ -161,6 +163,19 @@ export function zenToResource(config: ProviderKeyConfig, index: number): Provide
   };
 }
 
+export function tokenRouterToResource(config: ProviderKeyConfig, index: number): ProviderResource {
+  const resource = providerKeyToResource('tokenRouter', config, index);
+  const entries = config.apiKeyEntries?.length
+    ? config.apiKeyEntries
+    : [{ apiKey: config.apiKey ?? '', proxyUrl: config.proxyUrl }];
+  return {
+    ...resource,
+    name: resource.name ?? TOKEN_ROUTER_DISPLAY_NAME,
+    apiKeyEntryCount: entries.length,
+    raw: { ...config, apiKeyEntries: entries },
+  };
+}
+
 export interface NvidiaNimGroup {
   entries: ProviderKeyConfig[];
   indices: number[];
@@ -173,7 +188,13 @@ export interface ZenGroup {
   raw: ProviderKeyConfig;
 }
 
-type ProviderKeyGroup = NvidiaNimGroup | ZenGroup;
+export interface TokenRouterGroup {
+  entries: ProviderKeyConfig[];
+  indices: number[];
+  raw: ProviderKeyConfig;
+}
+
+type ProviderKeyGroup = NvidiaNimGroup | ZenGroup | TokenRouterGroup;
 
 const providerKeyGroupSignature = (item: ProviderKeyConfig) =>
   JSON.stringify([
@@ -236,6 +257,10 @@ export function groupNvidiaEntries(config: Config | null | undefined): NvidiaNim
 
 export function groupZenEntries(config: Config | null | undefined): ZenGroup[] {
   return groupProviderKeyEntries(config?.zenApiKeys ?? [], providerKeyGroupSignature);
+}
+
+export function groupTokenRouterEntries(config: Config | null | undefined): TokenRouterGroup[] {
+  return groupProviderKeyEntries(config?.tokenRouterApiKeys ?? [], providerKeyGroupSignature);
 }
 
 export function claudeToResource(config: ProviderKeyConfig, index: number): ProviderResource {

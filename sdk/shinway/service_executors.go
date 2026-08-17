@@ -309,6 +309,15 @@ func (s *Service) registerExecutorForAuth(a *coreauth.Auth, forceReplace bool) {
 			}
 		}
 		s.coreManager.RegisterExecutor(executor.NewZenExecutor(cfg))
+	case "tokenrouter":
+		if !forceReplace {
+			if existingExecutor, hasExecutor := s.coreManager.Executor("tokenrouter"); hasExecutor {
+				if _, isTokenRouterExecutor := existingExecutor.(*executor.TokenRouterExecutor); isTokenRouterExecutor {
+					return
+				}
+			}
+		}
+		s.coreManager.RegisterExecutor(executor.NewTokenRouterExecutor(cfg))
 	default:
 		providerKey := strings.ToLower(strings.TrimSpace(a.Provider))
 		if providerKey == "" {

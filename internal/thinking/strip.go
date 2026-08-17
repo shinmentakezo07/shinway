@@ -52,6 +52,8 @@ func StripThinkingConfig(body []byte, provider string) []byte {
 		paths = []string{"reasoning_effort", "chat_template_kwargs"}
 	case "zen":
 		paths = []string{"reasoning_effort"}
+	case "tokenrouter":
+		paths = []string{"reasoning_effort"}
 	case "kimi":
 		paths = []string{
 			"reasoning_effort",

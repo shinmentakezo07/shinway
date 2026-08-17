@@ -101,6 +101,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 	cfg.SanitizeXAIKeys()
 	cfg.SanitizeNVIDIAKeys()
 	cfg.SanitizeZenKeys()
+	cfg.SanitizeTokenRouterKeys()
 	cfg.SanitizeCodexHeaderDefaults()
 	cfg.SanitizeClaudeHeaderDefaults()
 	cfg.SanitizeClaudeKeys()

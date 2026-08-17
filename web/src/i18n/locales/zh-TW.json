@@ -1439,7 +1439,8 @@
       "qiniuCloud": "七牛雲",
       "kimi": "Kimi",
       "nvidiaNim": "NVIDIA NIM",
-      "zen": "OpenCode Zen"
+      "zen": "OpenCode Zen",
+      "tokenRouter": "TokenRouter"
     },
     "table": {
       "key": "金鑰",

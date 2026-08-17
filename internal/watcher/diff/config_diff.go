@@ -431,6 +431,47 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 		}
 	}
 
+	// TokenRouter keys (do not print key material)
+	if len(oldCfg.TokenRouterKey) != len(newCfg.TokenRouterKey) {
+		changes = append(changes, fmt.Sprintf("tokenrouter-api-key count: %d -> %d", len(oldCfg.TokenRouterKey), len(newCfg.TokenRouterKey)))
+	} else {
+		for i := range oldCfg.TokenRouterKey {
+			o := oldCfg.TokenRouterKey[i]
+			n := newCfg.TokenRouterKey[i]
+			if strings.TrimSpace(o.BaseURL) != strings.TrimSpace(n.BaseURL) {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].base-url: %s -> %s", i, formatURL(o.BaseURL), formatURL(n.BaseURL)))
+			}
+			if strings.TrimSpace(o.ProxyURL) != strings.TrimSpace(n.ProxyURL) {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
+			}
+			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
+			}
+			if o.Priority != n.Priority {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].priority: %d -> %d", i, o.Priority, n.Priority))
+			}
+			if o.DisableCooling != n.DisableCooling {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].disable-cooling: %t -> %t", i, o.DisableCooling, n.DisableCooling))
+			}
+			if strings.TrimSpace(o.APIKey) != strings.TrimSpace(n.APIKey) {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].api-key: updated", i))
+			}
+			if !equalStringMap(o.Headers, n.Headers) {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].headers: updated", i))
+			}
+			oldModels := SummarizeCodexModels(o.Models)
+			newModels := SummarizeCodexModels(n.Models)
+			if oldModels.hash != newModels.hash {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].models: updated (%d -> %d entries)", i, oldModels.count, newModels.count))
+			}
+			oldExcluded := SummarizeExcludedModels(o.ExcludedModels)
+			newExcluded := SummarizeExcludedModels(n.ExcludedModels)
+			if oldExcluded.hash != newExcluded.hash {
+				changes = append(changes, fmt.Sprintf("tokenrouter[%d].excluded-models: updated (%d -> %d entries)", i, oldExcluded.count, newExcluded.count))
+			}
+		}
+	}
+
 	if entries, _ := DiffOAuthExcludedModelChanges(oldCfg.OAuthExcludedModels, newCfg.OAuthExcludedModels); len(entries) > 0 {
 		changes = append(changes, entries...)
 	}

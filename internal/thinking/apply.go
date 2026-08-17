@@ -29,6 +29,7 @@ var nativeProviderAppliers = map[string]ProviderApplier{
 	"xai":         nil,
 	"nvidia":      nil,
 	"zen":         nil,
+	"tokenrouter": nil,
 }
 
 // pluginProviderAppliers maps plugin-owned provider names to their implementations.
@@ -437,7 +438,7 @@ func extractThinkingConfig(body []byte, provider string) ThinkingConfig {
 		return extractCodexConfig(body)
 	case "kimi":
 		return extractKimiConfig(body)
-	case "nvidia", "zen":
+	case "nvidia", "zen", "tokenrouter":
 		return extractOpenAIConfig(body)
 	default:
 		return ThinkingConfig{}

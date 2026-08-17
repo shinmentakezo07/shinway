@@ -37,6 +37,8 @@ const NVIDIA_KEY_FIELDS = CODEX_KEY_FIELDS;
 // Zen is HTTP-only. Preserve a legacy/manual websockets field rather than
 // clearing it when an unrelated setting is saved from the management UI.
 const ZEN_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
+// TokenRouter is HTTP-only as well; same preservation rule applies.
+const TOKEN_ROUTER_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 const CLAUDE_KEY_FIELDS = [
   ...PROVIDER_COMMON_KEY_FIELDS,
   'cloak',
@@ -524,6 +526,30 @@ export const providersApi = {
 
   deleteZenConfig: (apiKey: string, baseUrl?: string) =>
     apiClient.delete(`/zen-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
+
+  createTokenRouterConfig: (config: ProviderKeyConfig) =>
+    mutateLatestProviderList('tokenrouter-api-key', (latestItems) =>
+      appendLatestProviderRecord(latestItems, serializeProviderKey(config), (raw, payload) =>
+        mergeProviderKeyPayload(raw, payload, TOKEN_ROUTER_KEY_FIELDS)
+      )
+    ),
+
+  updateTokenRouterConfig: (
+    apiKey: string,
+    baseUrl: string | undefined,
+    config: ProviderKeyConfig
+  ) =>
+    mutateLatestProviderList('tokenrouter-api-key', (latestItems) =>
+      replaceLatestProviderRecord(
+        latestItems,
+        (record) => matchesProviderKey(record, apiKey, baseUrl),
+        serializeProviderKey(config),
+        (raw, payload) => mergeProviderKeyPayload(raw, payload, TOKEN_ROUTER_KEY_FIELDS)
+      )
+    ),
+
+  deleteTokenRouterConfig: (apiKey: string, baseUrl?: string) =>
+    apiClient.delete(`/tokenrouter-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
 
   createClaudeConfig: (config: ProviderKeyConfig) =>
     mutateLatestProviderList('claude-api-key', (latestItems) =>

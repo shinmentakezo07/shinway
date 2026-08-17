@@ -121,6 +121,9 @@ type Config struct {
 	// ZenKey defines OpenCode Zen API key configurations using the same structure as Codex API keys.
 	ZenKey []ZenKey `yaml:"zen-api-key" json:"zen-api-key"`
 
+	// TokenRouterKey defines TokenRouter API key configurations using the same structure as Codex API keys.
+	TokenRouterKey []TokenRouterKey `yaml:"tokenrouter-api-key" json:"tokenrouter-api-key"`
+
 	// XAI configures provider-wide xAI request behavior.
 	XAI XAIConfig `yaml:"xai" json:"xai"`
 

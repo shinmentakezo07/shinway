@@ -415,6 +415,9 @@ func BuildAPIKeyClients(cfg *config.Config) (int, int, int, int, int, int) {
 	if len(cfg.ZenKey) > 0 {
 		xaiAPIKeyCount += len(cfg.ZenKey)
 	}
+	if len(cfg.TokenRouterKey) > 0 {
+		xaiAPIKeyCount += len(cfg.TokenRouterKey)
+	}
 	if len(cfg.OpenAICompatibility) > 0 {
 		for _, compatConfig := range cfg.OpenAICompatibility {
 			if compatConfig.Disabled {

@@ -148,6 +148,11 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/zen-api-key", s.mgmt.PatchZenKey)
 		mgmt.DELETE("/zen-api-key", s.mgmt.DeleteZenKey)
 
+		mgmt.GET("/tokenrouter-api-key", s.mgmt.GetTokenRouterKeys)
+		mgmt.PUT("/tokenrouter-api-key", s.mgmt.PutTokenRouterKeys)
+		mgmt.PATCH("/tokenrouter-api-key", s.mgmt.PatchTokenRouterKey)
+		mgmt.DELETE("/tokenrouter-api-key", s.mgmt.DeleteTokenRouterKey)
+
 		mgmt.GET("/openai-compatibility", s.mgmt.GetOpenAICompat)
 		mgmt.PUT("/openai-compatibility", s.mgmt.PutOpenAICompat)
 		mgmt.PATCH("/openai-compatibility", s.mgmt.PatchOpenAICompat)

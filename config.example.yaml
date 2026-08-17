@@ -447,6 +447,34 @@ nonstream-keepalive-interval: 0
 #     excluded-models:
 #       - "*-free" # exclude the free promo models, for example
 
+# TokenRouter API keys (https://www.tokenrouter.com)
+# Unified multi-model OpenAI-compatible gateway: one API key and one base URL
+# route to 50+ upstream models (Claude, GPT, Gemini, DeepSeek, Kimi, Qwen, GLM,
+# and more). Chat completions are served at
+# https://api.tokenrouter.com/v1/chat/completions; get an API key from
+# https://www.tokenrouter.com/console/token. Multiple entries round-robin
+# automatically; use "weight" for weighted selection. Model IDs carry a
+# provider prefix (e.g. "anthropic/claude-sonnet-4.6",
+# "deepseek/deepseek-v4-pro-0813", "openai/gpt-5.6-sol").
+# tokenrouter-api-key:
+#   - api-key: "sk-..."
+#     weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
+#     prefix: "tr" # optional: require calls like "tr/anthropic/claude-sonnet-4.6" to target this credential
+#     disable-cooling: false # optional: per-auth override for auth/model cooldown scheduling
+#     base-url: "https://api.tokenrouter.com/v1" # optional; defaults to the hosted TokenRouter endpoint
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     proxy-url: "socks5://proxy.example.com:1080"
+#     models:
+#       - name: "anthropic/claude-sonnet-4.6"
+#         alias: "claude-sonnet"
+#         display-name: "Claude Sonnet 4.6"
+#         force-mapping: true
+#       - name: "deepseek/deepseek-v4-pro-0813"
+#         alias: "dsv4-pro"
+#     excluded-models:
+#       - "*-free" # exclude free-tier models, for example
+
 # Claude API keys
 # claude-api-key:
 #   - api-key: "sk-atSM..." # use the official claude API key, no need to set the base url
