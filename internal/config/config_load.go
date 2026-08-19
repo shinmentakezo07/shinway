@@ -171,6 +171,9 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// Sanitize TokenRouter keys: default empty base-url to the hosted endpoint
 	cfg.SanitizeTokenRouterKeys()
 
+	// Sanitize OrcaRouter keys: default empty base-url to the hosted endpoint
+	cfg.SanitizeOrcaRouterKeys()
+
 	// Sanitize Codex header defaults.
 	cfg.SanitizeCodexHeaderDefaults()
 

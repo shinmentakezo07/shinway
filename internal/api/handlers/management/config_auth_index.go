@@ -43,6 +43,11 @@ type tokenRouterKeyWithAuthIndex struct {
 	AuthIndex string `json:"auth-index,omitempty"`
 }
 
+type orcaRouterKeyWithAuthIndex struct {
+	config.OrcaRouterKey
+	AuthIndex string `json:"auth-index,omitempty"`
+}
+
 type vertexCompatKeyWithAuthIndex struct {
 	config.VertexCompatKey
 	AuthIndex string `json:"auth-index,omitempty"`
@@ -325,6 +330,35 @@ func (h *Handler) tokenRouterKeysWithAuthIndex() []tokenRouterKeyWithAuthIndex {
 		out[i] = tokenRouterKeyWithAuthIndex{
 			TokenRouterKey: entry,
 			AuthIndex:      authIndex,
+		}
+	}
+	return out
+}
+
+func (h *Handler) orcaRouterKeysWithAuthIndex() []orcaRouterKeyWithAuthIndex {
+	if h == nil {
+		return nil
+	}
+	liveIndexByID := h.liveAuthIndexByID()
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.cfg == nil {
+		return nil
+	}
+
+	idGen := synthesizer.NewStableIDGenerator()
+	out := make([]orcaRouterKeyWithAuthIndex, len(h.cfg.OrcaRouterKey))
+	for i := range h.cfg.OrcaRouterKey {
+		entry := h.cfg.OrcaRouterKey[i]
+		authIndex := ""
+		if key := strings.TrimSpace(entry.APIKey); key != "" {
+			id, _ := idGen.Next("orcarouter:apikey", key, entry.BaseURL)
+			authIndex = liveIndexByID[id]
+		}
+		out[i] = orcaRouterKeyWithAuthIndex{
+			OrcaRouterKey: entry,
+			AuthIndex:     authIndex,
 		}
 	}
 	return out

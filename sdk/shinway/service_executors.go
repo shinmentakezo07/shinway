@@ -318,6 +318,15 @@ func (s *Service) registerExecutorForAuth(a *coreauth.Auth, forceReplace bool) {
 			}
 		}
 		s.coreManager.RegisterExecutor(executor.NewTokenRouterExecutor(cfg))
+	case "orcarouter":
+		if !forceReplace {
+			if existingExecutor, hasExecutor := s.coreManager.Executor("orcarouter"); hasExecutor {
+				if _, isOrcaRouterExecutor := existingExecutor.(*executor.OrcaRouterExecutor); isOrcaRouterExecutor {
+					return
+				}
+			}
+		}
+		s.coreManager.RegisterExecutor(executor.NewOrcaRouterExecutor(cfg))
 	default:
 		providerKey := strings.ToLower(strings.TrimSpace(a.Provider))
 		if providerKey == "" {

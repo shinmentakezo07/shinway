@@ -518,6 +518,12 @@ type TokenRouterKey = CodexKey
 // TokenRouterModel uses the Codex model mapping structure for TokenRouter models.
 type TokenRouterModel = CodexModel
 
+// OrcaRouterKey uses the Codex API key structure for native OrcaRouter execution.
+type OrcaRouterKey = CodexKey
+
+// OrcaRouterModel uses the Codex model mapping structure for OrcaRouter models.
+type OrcaRouterModel = CodexModel
+
 // NVIDIAConfig configures provider-wide NVIDIA NIM request behavior.
 type NVIDIAConfig struct {
 	// DefaultThinking controls whether requests without an explicit thinking suffix or

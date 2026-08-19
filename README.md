@@ -44,6 +44,10 @@ You can access the following providers locally and with multiple CLI accounts th
         <td align="center"><a href="https://www.tokenrouter.com"><img src="./web/src/assets/icons/tokenrouter.svg" alt="TokenRouter" width="28" height="28" /></a></td>
         <td><a href="https://www.tokenrouter.com">TokenRouter</a> unified multi-model gateway (Claude, GPT, Gemini, DeepSeek, Kimi, Qwen, GLM, and more). TokenRouter is a fully OpenAI-compatible gateway served at <code>https://api.tokenrouter.com/v1/chat/completions</code>: one API key and one base URL route to 50+ upstream models whose IDs carry a provider prefix (e.g. <code>anthropic/claude-sonnet-4.6</code>, <code>deepseek/deepseek-v4-pro-0813</code>). shinway treats it as a first-class OpenAI-compatible provider: multi-key round-robin, per-key base URL/prefix/proxy overrides, model aliasing, reasoning via <code>reasoning_effort</code>, and model discovery from <code>/models</code>. Get an API key from the <a href="https://www.tokenrouter.com/console/token">TokenRouter console</a>; the default base URL is <code>https://api.tokenrouter.com/v1</code>.</td>
     </tr>
+    <tr>
+        <td align="center"><a href="https://orcarouter.ai"><img src="./web/src/assets/icons/orcarouter.svg" alt="OrcaRouter" width="28" height="28" /></a></td>
+        <td><a href="https://orcarouter.ai">OrcaRouter</a> zero-markup multi-model gateway (OpenAI, Anthropic, Gemini, DeepSeek, Grok, Qwen, Kimi, MiniMax, and more). OrcaRouter is a fully OpenAI-compatible gateway served at <code>https://api.orcarouter.ai/v1/chat/completions</code>: one API key (keys start with <code>sk-orca-</code>) and one base URL route to upstream models whose IDs carry a provider prefix (e.g. <code>openai/gpt-4o-mini</code>, <code>anthropic/claude-sonnet-4.6</code>, <code>deepseek/deepseek-chat</code>). shinway treats it as a first-class OpenAI-compatible provider: multi-key round-robin, per-key base URL/prefix/proxy overrides, model aliasing, reasoning via <code>reasoning_effort</code>, and model discovery from <code>/models</code>. The default base URL is <code>https://api.orcarouter.ai/v1</code>.</td>
+    </tr>
 </tbody>
 </table>
 
@@ -133,6 +137,7 @@ PackyCode provides special discounts for our software users: register using <a h
 - NVIDIA NIM hosted models via config (DeepSeek, MiniMax, Kimi, Inkling, and more) with per-model-family reasoning profile mapping
 - OpenCode Zen curated models via config (GLM, DeepSeek, Kimi, MiniMax, free promo models, and more) with multi-key round-robin and reasoning support
 - TokenRouter unified multi-model gateway via config (Claude, GPT, Gemini, DeepSeek, Kimi, Qwen, GLM, and more) with multi-key round-robin and reasoning support
+- OrcaRouter zero-markup multi-model gateway via config (OpenAI, Anthropic, Gemini, DeepSeek, Grok, Qwen, Kimi, MiniMax, and more) with multi-key round-robin and reasoning support
 - Reusable Go SDK for embedding the proxy (see `docs/sdk-usage.md`)
 
 ## Getting Started

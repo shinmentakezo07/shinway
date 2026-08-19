@@ -25,10 +25,12 @@ import {
   groupNvidiaEntries,
   groupZenEntries,
   groupTokenRouterEntries,
+  groupOrcaRouterEntries,
   nvidiaToResource,
   openaiToResource,
   zenToResource,
   tokenRouterToResource,
+  orcaRouterToResource,
   qiniuCloudToResource,
   kimiToResource,
   vertexToResource,
@@ -157,7 +159,16 @@ const buildModelAliases = (
     .filter((m) => m.name);
 
 const buildProviderKeyConfig = (
-  brand: 'gemini' | 'codex' | 'xai' | 'nvidiaNim' | 'zen' | 'tokenRouter' | 'claude' | 'vertex',
+  brand:
+    | 'gemini'
+    | 'codex'
+    | 'xai'
+    | 'nvidiaNim'
+    | 'zen'
+    | 'tokenRouter'
+    | 'orcaRouter'
+    | 'claude'
+    | 'vertex',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | GeminiKeyConfig | null
 ): ProviderKeyConfig | GeminiKeyConfig => {
@@ -366,7 +377,7 @@ const toggleSponsorConfig = async (raw: SponsorProviderRaw, disabled: boolean) =
 };
 
 const buildMultiKeyProviderConfig = (
-  brand: 'nvidiaNim' | 'zen' | 'tokenRouter',
+  brand: 'nvidiaNim' | 'zen' | 'tokenRouter' | 'orcaRouter',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | null
 ): ProviderKeyConfig => {
@@ -406,6 +417,11 @@ const buildTokenRouterConfig = (
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | null
 ): ProviderKeyConfig => buildMultiKeyProviderConfig('tokenRouter', input, existing);
+
+const buildOrcaRouterConfig = (
+  input: ProviderEntryFormInput,
+  existing?: ProviderKeyConfig | null
+): ProviderKeyConfig => buildMultiKeyProviderConfig('orcaRouter', input, existing);
 
 /* -------------------------------------------------------------------------- */
 /* hook                                                                       */
@@ -543,6 +559,23 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               ...resource,
               selector: {
                 brand: 'tokenRouter',
+                apiKey: firstEntry?.apiKey ?? '',
+                baseUrl: group.raw.baseUrl,
+                index: primaryIndex,
+                indices: group.indices,
+              },
+            };
+          });
+          break;
+        case 'orcaRouter':
+          resources = groupOrcaRouterEntries(config).map((group, groupIndex) => {
+            const primaryIndex = group.indices[0] ?? groupIndex;
+            const resource = orcaRouterToResource(group.raw, primaryIndex);
+            const firstEntry = group.raw.apiKeyEntries?.[0];
+            return {
+              ...resource,
+              selector: {
+                brand: 'orcaRouter',
                 apiKey: firstEntry?.apiKey ?? '',
                 baseUrl: group.raw.baseUrl,
                 index: primaryIndex,
@@ -799,6 +832,18 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               apiKeyEntries: undefined,
             });
           }
+        } else if (brand === 'orcaRouter') {
+          const built = buildOrcaRouterConfig(input);
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const entry = built.apiKeyEntries?.[i];
+            await providersApi.createOrcaRouterConfig({
+              ...built,
+              apiKey: entry?.apiKey ?? built.apiKey ?? '',
+              proxyUrl: entry?.proxyUrl ?? built.proxyUrl,
+              apiKeyEntries: undefined,
+            });
+          }
         } else if (brand === 'claude') {
           await providersApi.createClaudeConfig(
             buildProviderKeyConfig('claude', input) as ProviderKeyConfig
@@ -930,6 +975,31 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               });
             }
           }
+        } else if (brand === 'orcaRouter' && selector.brand === 'orcaRouter') {
+          const existing = resource.raw as ProviderKeyConfig;
+          const built = buildOrcaRouterConfig(input, existing);
+          const oldIndices = selector.indices ?? [selector.index];
+          const keysScale = Math.max(built.apiKeyEntries?.length ?? 0, oldIndices.length, 1);
+          for (let i = 0; i < keysScale; i += 1) {
+            const oldIndex = oldIndices[i];
+            const oldConfig = config?.orcaRouterApiKeys?.[oldIndex];
+            const entry = built.apiKeyEntries?.[i];
+            if (oldConfig && entry) {
+              await providersApi.updateOrcaRouterConfig(oldConfig.apiKey, oldConfig.baseUrl, {
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            } else if (oldConfig && !entry) {
+              await providersApi.deleteOrcaRouterConfig(oldConfig.apiKey, oldConfig.baseUrl);
+            } else if (entry) {
+              await providersApi.createOrcaRouterConfig({
+                ...built,
+                apiKey: entry.apiKey,
+                proxyUrl: entry.proxyUrl,
+              });
+            }
+          }
         } else if (brand === 'claude' && selector.brand === 'claude') {
           const existing = resource.raw as ProviderKeyConfig;
           await providersApi.updateClaudeConfig(
@@ -1020,6 +1090,16 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           }
           const next = (config?.tokenRouterApiKeys ?? []).filter((_, i) => !indices.includes(i));
           updateConfigValue('tokenrouter-api-key', next);
+        } else if (sel.brand === 'orcaRouter') {
+          const indices = sel.indices ?? [sel.index];
+          const configs = indices
+            .map((i) => config?.orcaRouterApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            await providersApi.deleteOrcaRouterConfig(cfg.apiKey, cfg.baseUrl);
+          }
+          const next = (config?.orcaRouterApiKeys ?? []).filter((_, i) => !indices.includes(i));
+          updateConfigValue('orcarouter-api-key', next);
         } else if (sel.brand === 'claude') {
           await providersApi.deleteClaudeConfig(sel.apiKey, sel.baseUrl);
           const next = (config?.claudeApiKeys ?? []).filter((_, i) => i !== sel.index);
@@ -1146,6 +1226,20 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
               ? withDisableAllModelsRule(cfg.excludedModels)
               : withoutDisableAllModelsRule(cfg.excludedModels);
             await providersApi.updateTokenRouterConfig(cfg.apiKey, cfg.baseUrl, {
+              ...cfg,
+              excludedModels,
+            });
+          }
+        } else if (brand === 'orcaRouter' && selector.brand === 'orcaRouter') {
+          const indices = selector.indices ?? [selector.index];
+          const configs = indices
+            .map((i) => config?.orcaRouterApiKeys?.[i])
+            .filter((c): c is ProviderKeyConfig => Boolean(c));
+          for (const cfg of configs) {
+            const excludedModels = disabled
+              ? withDisableAllModelsRule(cfg.excludedModels)
+              : withoutDisableAllModelsRule(cfg.excludedModels);
+            await providersApi.updateOrcaRouterConfig(cfg.apiKey, cfg.baseUrl, {
               ...cfg,
               excludedModels,
             });

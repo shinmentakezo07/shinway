@@ -184,7 +184,8 @@ export function useConnectivityTest(
         brand !== 'openaiCompatibility' &&
         brand !== 'nvidiaNim' &&
         brand !== 'zen' &&
-        brand !== 'tokenRouter'
+        brand !== 'tokenRouter' &&
+        brand !== 'orcaRouter'
       )
         return false;
 
@@ -291,7 +292,8 @@ export function useConnectivityTest(
       brand !== 'openaiCompatibility' &&
       brand !== 'nvidiaNim' &&
       brand !== 'zen' &&
-      brand !== 'tokenRouter'
+      brand !== 'tokenRouter' &&
+      brand !== 'orcaRouter'
     )
       return;
     const entries = apiKeyEntries ?? [];
@@ -305,7 +307,8 @@ export function useConnectivityTest(
       brand !== 'xai' &&
       brand !== 'nvidiaNim' &&
       brand !== 'zen' &&
-      brand !== 'tokenRouter'
+      brand !== 'tokenRouter' &&
+      brand !== 'orcaRouter'
     )
       return;
 
@@ -315,10 +318,13 @@ export function useConnectivityTest(
       return;
     }
 
-    // NVIDIA NIM / OpenCode Zen / TokenRouter expose OpenAI chat-completions,
-    // Codex/xAI use the Responses API.
+    // NVIDIA NIM / OpenCode Zen / TokenRouter / OrcaRouter expose OpenAI
+    // chat-completions, Codex/xAI use the Responses API.
     const endpoint =
-      brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter'
+      brand === 'nvidiaNim' ||
+      brand === 'zen' ||
+      brand === 'tokenRouter' ||
+      brand === 'orcaRouter'
         ? buildOpenAIChatCompletionsEndpoint(trimmedBase)
         : buildCodexResponsesEndpoint(trimmedBase);
     if (!endpoint) {
@@ -336,7 +342,12 @@ export function useConnectivityTest(
     let explicitKey = (apiKey ?? '').trim();
     let persistedKey = (fallbackApiKey ?? '').trim();
     let entryAuthIndex = '';
-    if (brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter') {
+    if (
+      brand === 'nvidiaNim' ||
+      brand === 'zen' ||
+      brand === 'tokenRouter' ||
+      brand === 'orcaRouter'
+    ) {
       const firstEntry = (apiKeyEntries ?? []).find(
         (entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim()
       );
@@ -374,7 +385,10 @@ export function useConnectivityTest(
     const requestHeaders = brand === 'zen' ? withZenIdentityHeaders(headerObj) : headerObj;
 
     const payload =
-      brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter'
+      brand === 'nvidiaNim' ||
+      brand === 'zen' ||
+      brand === 'tokenRouter' ||
+      brand === 'orcaRouter'
         ? JSON.stringify({
             model,
             messages: [{ role: 'user', content: 'Hi' }],

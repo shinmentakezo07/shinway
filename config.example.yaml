@@ -475,6 +475,34 @@ nonstream-keepalive-interval: 0
 #     excluded-models:
 #       - "*-free" # exclude free-tier models, for example
 
+# OrcaRouter API keys (https://orcarouter.ai)
+# Zero-markup multi-model OpenAI-compatible gateway: one API key and one base
+# URL route to upstream models from OpenAI, Anthropic, Gemini, DeepSeek, Grok,
+# Qwen, Kimi, MiniMax, and more. Chat completions are served at
+# https://api.orcarouter.ai/v1/chat/completions; API keys start with
+# "sk-orca-". Multiple entries round-robin automatically; use "weight" for
+# weighted selection. Model IDs carry a provider prefix (e.g.
+# "openai/gpt-4o-mini", "anthropic/claude-sonnet-4.6",
+# "deepseek/deepseek-chat").
+# orcarouter-api-key:
+#   - api-key: "sk-orca-..."
+#     weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
+#     prefix: "orca" # optional: require calls like "orca/openai/gpt-4o-mini" to target this credential
+#     disable-cooling: false # optional: per-auth override for auth/model cooldown scheduling
+#     base-url: "https://api.orcarouter.ai/v1" # optional; defaults to the hosted OrcaRouter endpoint
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     proxy-url: "socks5://proxy.example.com:1080"
+#     models:
+#       - name: "openai/gpt-4o-mini"
+#         alias: "gpt-mini"
+#         display-name: "GPT-4o mini"
+#         force-mapping: true
+#       - name: "deepseek/deepseek-chat"
+#         alias: "ds-chat"
+#     excluded-models:
+#       - "*-free" # exclude free-tier models, for example
+
 # Claude API keys
 # claude-api-key:
 #   - api-key: "sk-atSM..." # use the official claude API key, no need to set the base url

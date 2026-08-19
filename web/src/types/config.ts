@@ -29,6 +29,7 @@ export interface Config {
   nvidiaApiKeys?: ProviderKeyConfig[];
   zenApiKeys?: ProviderKeyConfig[];
   tokenRouterApiKeys?: ProviderKeyConfig[];
+  orcaRouterApiKeys?: ProviderKeyConfig[];
   claudeApiKeys?: ProviderKeyConfig[];
   vertexApiKeys?: ProviderKeyConfig[];
   openaiCompatibility?: OpenAIProviderConfig[];
@@ -54,6 +55,7 @@ export type RawConfigSection =
   | 'nvidia-api-key'
   | 'zen-api-key'
   | 'tokenrouter-api-key'
+  | 'orcarouter-api-key'
   | 'claude-api-key'
   | 'vertex-api-key'
   | 'openai-compatibility'

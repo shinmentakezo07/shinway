@@ -32,6 +32,7 @@ import { CLAUDE_API_BASE_URL } from '../../claudeApi';
 import { NVIDIA_NIM_DEFAULT_BASE_URL } from '../../nvidiaNim';
 import { ZEN_DEFAULT_BASE_URL } from '../../zen';
 import { TOKEN_ROUTER_DEFAULT_BASE_URL } from '../../tokenRouter';
+import { ORCA_ROUTER_DEFAULT_BASE_URL } from '../../orcaRouter';
 
 interface BaseProviderFormProps {
   brand: ProviderBrand;
@@ -82,7 +83,9 @@ function buildInitialForm(
                 ? ZEN_DEFAULT_BASE_URL
                 : brand === 'tokenRouter'
                   ? TOKEN_ROUTER_DEFAULT_BASE_URL
-                  : '',
+                  : brand === 'orcaRouter'
+                    ? ORCA_ROUTER_DEFAULT_BASE_URL
+                    : '',
       proxyUrl: '',
       prefix: '',
       disabled: false,
@@ -103,6 +106,7 @@ function buildInitialForm(
         brand === 'nvidiaNim' ||
         brand === 'zen' ||
         brand === 'tokenRouter' ||
+        brand === 'orcaRouter' ||
         isClaudeLikeBrand(brand) ||
         brand === 'gemini'
           ? ''
@@ -111,7 +115,8 @@ function buildInitialForm(
         brand === 'openaiCompatibility' ||
         brand === 'nvidiaNim' ||
         brand === 'zen' ||
-        brand === 'tokenRouter'
+        brand === 'tokenRouter' ||
+        brand === 'orcaRouter'
           ? [emptyApiKeyEntry()]
           : undefined,
     };
@@ -155,7 +160,7 @@ function buildInitialForm(
     };
   }
 
-  if (brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter') {
+  if (brand === 'nvidiaNim' || brand === 'zen' || brand === 'tokenRouter' || brand === 'orcaRouter') {
     const cfg = raw as ProviderKeyConfig;
     const disabled = hasDisableAllModelsRule(cfg.excludedModels);
     const excludedList = stripDisableAllRule(cfg.excludedModels);
@@ -488,6 +493,7 @@ export function BaseProviderForm({
     brand === 'nvidiaNim' ||
     brand === 'zen' ||
     brand === 'tokenRouter' ||
+    brand === 'orcaRouter' ||
     isClaudeLikeBrand(brand) ||
     brand === 'openaiCompatibility';
   const supportsOpenAIModelOptions = brand === 'openaiCompatibility';
@@ -496,7 +502,8 @@ export function BaseProviderForm({
     brand === 'xai' ||
     brand === 'nvidiaNim' ||
     brand === 'zen' ||
-    brand === 'tokenRouter'
+    brand === 'tokenRouter' ||
+    brand === 'orcaRouter'
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
       : brand === 'gemini'
         ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
@@ -666,6 +673,7 @@ export function BaseProviderForm({
               brand === 'nvidiaNim' ||
               brand === 'zen' ||
               brand === 'tokenRouter' ||
+              brand === 'orcaRouter' ||
               isClaudeLikeBrand(brand) ||
               brand === 'gemini' ? (
                 <span className={styles.labelHint}>

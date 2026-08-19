@@ -194,6 +194,20 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
 			}
 		}
 		models = applyExcludedModels(models, excluded)
+	case "orcarouter":
+		// OrcaRouter has no curated builtin catalog: models are always derived
+		// from the user's config (Quick Fill fetches them from /models at
+		// https://api.orcarouter.ai/v1). This keeps the registry truthful
+		// about which model IDs are actually reachable for a given key.
+		if entry := s.resolveConfigOrcaRouterKey(a); entry != nil {
+			if len(entry.Models) > 0 {
+				models = buildOrcaRouterConfigModels(entry)
+			}
+			if authKind == "apikey" {
+				excluded = entry.ExcludedModels
+			}
+		}
+		models = applyExcludedModels(models, excluded)
 	default:
 		// Handle OpenAI-compatibility providers by name using config
 		if s.cfg != nil {
@@ -528,6 +542,13 @@ func (s *Service) resolveConfigTokenRouterKey(auth *coreauth.Auth) *config.Token
 		return nil
 	}
 	return resolveConfigCodexStyleKey(auth, s.cfg.TokenRouterKey)
+}
+
+func (s *Service) resolveConfigOrcaRouterKey(auth *coreauth.Auth) *config.OrcaRouterKey {
+	if s == nil || s.cfg == nil {
+		return nil
+	}
+	return resolveConfigCodexStyleKey(auth, s.cfg.OrcaRouterKey)
 }
 
 func resolveConfigCodexStyleKey(auth *coreauth.Auth, entries []config.CodexKey) *config.CodexKey {
@@ -899,6 +920,13 @@ func buildTokenRouterConfigModels(entry *config.TokenRouterKey) []*ModelInfo {
 		return nil
 	}
 	return buildConfigModels(entry.Models, "tokenrouter", "tokenrouter")
+}
+
+func buildOrcaRouterConfigModels(entry *config.OrcaRouterKey) []*ModelInfo {
+	if entry == nil {
+		return nil
+	}
+	return buildConfigModels(entry.Models, "orcarouter", "orcarouter")
 }
 
 func buildCodexConfigModels(entry *config.CodexKey) []*ModelInfo {

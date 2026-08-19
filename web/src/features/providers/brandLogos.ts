@@ -16,6 +16,7 @@ import kimiDarkLogo from '@/assets/icons/kimi-dark.svg';
 import nvidiaLogo from '@/assets/icons/nvidia.svg';
 import opencodeLogo from '@/assets/icons/opencode.svg';
 import tokenRouterLogo from '@/assets/icons/tokenrouter.svg';
+import orcaRouterLogo from '@/assets/icons/orcarouter.svg';
 import type { ProviderBrand } from './types';
 
 export interface ProviderBrandLogo {
@@ -47,4 +48,5 @@ export const PROVIDER_LOGOS: Record<ProviderBrand, ProviderBrandLogo> = {
   nvidiaNim: { src: nvidiaLogo, transparent: true },
   zen: { src: opencodeLogo, transparent: true },
   tokenRouter: { src: tokenRouterLogo, transparent: true },
+  orcaRouter: { src: orcaRouterLogo, transparent: true },
 };

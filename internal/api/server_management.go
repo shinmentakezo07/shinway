@@ -153,6 +153,11 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/tokenrouter-api-key", s.mgmt.PatchTokenRouterKey)
 		mgmt.DELETE("/tokenrouter-api-key", s.mgmt.DeleteTokenRouterKey)
 
+		mgmt.GET("/orcarouter-api-key", s.mgmt.GetOrcaRouterKeys)
+		mgmt.PUT("/orcarouter-api-key", s.mgmt.PutOrcaRouterKeys)
+		mgmt.PATCH("/orcarouter-api-key", s.mgmt.PatchOrcaRouterKey)
+		mgmt.DELETE("/orcarouter-api-key", s.mgmt.DeleteOrcaRouterKey)
+
 		mgmt.GET("/openai-compatibility", s.mgmt.GetOpenAICompat)
 		mgmt.PUT("/openai-compatibility", s.mgmt.PutOpenAICompat)
 		mgmt.PATCH("/openai-compatibility", s.mgmt.PatchOpenAICompat)

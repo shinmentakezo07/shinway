@@ -124,6 +124,9 @@ type Config struct {
 	// TokenRouterKey defines TokenRouter API key configurations using the same structure as Codex API keys.
 	TokenRouterKey []TokenRouterKey `yaml:"tokenrouter-api-key" json:"tokenrouter-api-key"`
 
+	// OrcaRouterKey defines OrcaRouter API key configurations using the same structure as Codex API keys.
+	OrcaRouterKey []OrcaRouterKey `yaml:"orcarouter-api-key" json:"orcarouter-api-key"`
+
 	// XAI configures provider-wide xAI request behavior.
 	XAI XAIConfig `yaml:"xai" json:"xai"`
 

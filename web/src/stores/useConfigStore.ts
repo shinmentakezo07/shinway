@@ -124,6 +124,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         case 'tokenrouter-api-key':
           nextConfig.tokenRouterApiKeys = value as Config['tokenRouterApiKeys'];
           break;
+        case 'orcarouter-api-key':
+          nextConfig.orcaRouterApiKeys = value as Config['orcaRouterApiKeys'];
+          break;
         case 'claude-api-key':
           nextConfig.claudeApiKeys = value as Config['claudeApiKeys'];
           break;

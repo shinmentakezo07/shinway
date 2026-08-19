@@ -39,6 +39,8 @@ const NVIDIA_KEY_FIELDS = CODEX_KEY_FIELDS;
 const ZEN_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 // TokenRouter is HTTP-only as well; same preservation rule applies.
 const TOKEN_ROUTER_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
+// OrcaRouter is HTTP-only as well; same preservation rule applies.
+const ORCA_ROUTER_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 const CLAUDE_KEY_FIELDS = [
   ...PROVIDER_COMMON_KEY_FIELDS,
   'cloak',
@@ -550,6 +552,30 @@ export const providersApi = {
 
   deleteTokenRouterConfig: (apiKey: string, baseUrl?: string) =>
     apiClient.delete(`/tokenrouter-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
+
+  createOrcaRouterConfig: (config: ProviderKeyConfig) =>
+    mutateLatestProviderList('orcarouter-api-key', (latestItems) =>
+      appendLatestProviderRecord(latestItems, serializeProviderKey(config), (raw, payload) =>
+        mergeProviderKeyPayload(raw, payload, ORCA_ROUTER_KEY_FIELDS)
+      )
+    ),
+
+  updateOrcaRouterConfig: (
+    apiKey: string,
+    baseUrl: string | undefined,
+    config: ProviderKeyConfig
+  ) =>
+    mutateLatestProviderList('orcarouter-api-key', (latestItems) =>
+      replaceLatestProviderRecord(
+        latestItems,
+        (record) => matchesProviderKey(record, apiKey, baseUrl),
+        serializeProviderKey(config),
+        (raw, payload) => mergeProviderKeyPayload(raw, payload, ORCA_ROUTER_KEY_FIELDS)
+      )
+    ),
+
+  deleteOrcaRouterConfig: (apiKey: string, baseUrl?: string) =>
+    apiClient.delete(`/orcarouter-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
 
   createClaudeConfig: (config: ProviderKeyConfig) =>
     mutateLatestProviderList('claude-api-key', (latestItems) =>

@@ -19,7 +19,8 @@ export type ProviderBrand =
   | 'kimi'
   | 'nvidiaNim'
   | 'zen'
-  | 'tokenRouter';
+  | 'tokenRouter'
+  | 'orcaRouter';
 
 export type SponsorProviderBrand = 'apikeyFun' | 'code0' | 'fennoAI' | 'qiniuCloud' | 'kimi';
 
@@ -36,6 +37,7 @@ export type ProviderResourceSelector =
   | { brand: 'nvidiaNim'; apiKey: string; baseUrl?: string; index: number; indices?: number[] }
   | { brand: 'zen'; apiKey: string; baseUrl?: string; index: number; indices?: number[] }
   | { brand: 'tokenRouter'; apiKey: string; baseUrl?: string; index: number; indices?: number[] }
+  | { brand: 'orcaRouter'; apiKey: string; baseUrl?: string; index: number; indices?: number[] }
   | { brand: 'claude'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'claudeApi'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'vertex'; apiKey: string; baseUrl?: string; index: number }

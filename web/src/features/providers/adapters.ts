@@ -35,6 +35,7 @@ import {
 import { NVIDIA_NIM_DISPLAY_NAME } from './nvidiaNim';
 import { ZEN_DISPLAY_NAME } from './zen';
 import { TOKEN_ROUTER_DISPLAY_NAME } from './tokenRouter';
+import { ORCA_ROUTER_DISPLAY_NAME } from './orcaRouter';
 import type {
   ProviderBrand,
   ProviderResource,
@@ -76,6 +77,7 @@ function providerKeyToResource(
     | 'nvidiaNim'
     | 'zen'
     | 'tokenRouter'
+    | 'orcaRouter'
     | 'claude'
     | 'claudeApi'
     | 'vertex',
@@ -176,6 +178,19 @@ export function tokenRouterToResource(config: ProviderKeyConfig, index: number):
   };
 }
 
+export function orcaRouterToResource(config: ProviderKeyConfig, index: number): ProviderResource {
+  const resource = providerKeyToResource('orcaRouter', config, index);
+  const entries = config.apiKeyEntries?.length
+    ? config.apiKeyEntries
+    : [{ apiKey: config.apiKey ?? '', proxyUrl: config.proxyUrl }];
+  return {
+    ...resource,
+    name: resource.name ?? ORCA_ROUTER_DISPLAY_NAME,
+    apiKeyEntryCount: entries.length,
+    raw: { ...config, apiKeyEntries: entries },
+  };
+}
+
 export interface NvidiaNimGroup {
   entries: ProviderKeyConfig[];
   indices: number[];
@@ -194,7 +209,13 @@ export interface TokenRouterGroup {
   raw: ProviderKeyConfig;
 }
 
-type ProviderKeyGroup = NvidiaNimGroup | ZenGroup | TokenRouterGroup;
+export interface OrcaRouterGroup {
+  entries: ProviderKeyConfig[];
+  indices: number[];
+  raw: ProviderKeyConfig;
+}
+
+type ProviderKeyGroup = NvidiaNimGroup | ZenGroup | TokenRouterGroup | OrcaRouterGroup;
 
 const providerKeyGroupSignature = (item: ProviderKeyConfig) =>
   JSON.stringify([
@@ -261,6 +282,10 @@ export function groupZenEntries(config: Config | null | undefined): ZenGroup[] {
 
 export function groupTokenRouterEntries(config: Config | null | undefined): TokenRouterGroup[] {
   return groupProviderKeyEntries(config?.tokenRouterApiKeys ?? [], providerKeyGroupSignature);
+}
+
+export function groupOrcaRouterEntries(config: Config | null | undefined): OrcaRouterGroup[] {
+  return groupProviderKeyEntries(config?.orcaRouterApiKeys ?? [], providerKeyGroupSignature);
 }
 
 export function claudeToResource(config: ProviderKeyConfig, index: number): ProviderResource {

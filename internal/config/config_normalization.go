@@ -150,6 +150,9 @@ const ZenProviderBaseURL = "https://opencode.ai/zen/v1"
 // TokenRouterProviderBaseURL is the canonical OpenAI-compatible base URL for TokenRouter.
 const TokenRouterProviderBaseURL = "https://api.tokenrouter.com/v1"
 
+// OrcaRouterProviderBaseURL is the canonical OpenAI-compatible base URL for OrcaRouter.
+const OrcaRouterProviderBaseURL = "https://api.orcarouter.ai/v1"
+
 // SanitizeNVIDIAKeys normalizes NVIDIA NIM API key entries.
 // Empty BaseURL is defaulted to the hosted NIM endpoint so users can leave it blank
 // in the Quick Fill UI.
@@ -196,6 +199,22 @@ func (cfg *Config) SanitizeTokenRouterKeys() {
 		}
 	}
 	cfg.TokenRouterKey = sanitizeCodexKeyEntries(cfg.TokenRouterKey)
+}
+
+// SanitizeOrcaRouterKeys normalizes OrcaRouter API key entries.
+// Empty BaseURL is defaulted to the hosted OrcaRouter endpoint so users can leave
+// it blank in the Quick Fill UI.
+func (cfg *Config) SanitizeOrcaRouterKeys() {
+	if cfg == nil {
+		return
+	}
+	for i := range cfg.OrcaRouterKey {
+		cfg.OrcaRouterKey[i].BaseURL = strings.TrimSpace(cfg.OrcaRouterKey[i].BaseURL)
+		if cfg.OrcaRouterKey[i].BaseURL == "" {
+			cfg.OrcaRouterKey[i].BaseURL = OrcaRouterProviderBaseURL
+		}
+	}
+	cfg.OrcaRouterKey = sanitizeCodexKeyEntries(cfg.OrcaRouterKey)
 }
 
 func sanitizeCodexKeyEntries(entries []CodexKey) []CodexKey {

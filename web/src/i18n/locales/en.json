@@ -1414,7 +1414,8 @@
       "kimi": "Kimi",
       "nvidiaNim": "NVIDIA NIM",
       "zen": "OpenCode Zen",
-      "tokenRouter": "TokenRouter"
+      "tokenRouter": "TokenRouter",
+      "orcaRouter": "OrcaRouter"
     },
     "table": {
       "key": "Key",

@@ -401,6 +401,10 @@ func resolveAPIKeyModelAliasWithResult(cfg *internalconfig.Config, auth *Auth, r
 		if entry := resolveTokenRouterAPIKeyConfig(cfg, auth); entry != nil {
 			models = asModelAliasEntries(entry.Models)
 		}
+	case "orcarouter":
+		if entry := resolveOrcaRouterAPIKeyConfig(cfg, auth); entry != nil {
+			models = asModelAliasEntries(entry.Models)
+		}
 	case "vertex":
 		if entry := resolveVertexAPIKeyConfig(cfg, auth); entry != nil {
 			models = asModelAliasEntries(entry.Models)
@@ -554,6 +558,10 @@ func (m *Manager) rebuildAPIKeyModelAliasLocked(cfg *internalconfig.Config) {
 			if entry := resolveTokenRouterAPIKeyConfig(cfg, auth); entry != nil {
 				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
 			}
+		case "orcarouter":
+			if entry := resolveOrcaRouterAPIKeyConfig(cfg, auth); entry != nil {
+				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
+			}
 		case "vertex":
 			if entry := resolveVertexAPIKeyConfig(cfg, auth); entry != nil {
 				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
@@ -683,6 +691,8 @@ func (m *Manager) applyAPIKeyModelAliasWithRouting(routing *apiKeyModelRoutingSn
 		upstreamModel = resolveUpstreamModelForZenAPIKey(cfg, auth, requestedModel)
 	case "tokenrouter":
 		upstreamModel = resolveUpstreamModelForTokenRouterAPIKey(cfg, auth, requestedModel)
+	case "orcarouter":
+		upstreamModel = resolveUpstreamModelForOrcaRouterAPIKey(cfg, auth, requestedModel)
 	case "vertex":
 		upstreamModel = resolveUpstreamModelForVertexAPIKey(cfg, auth, requestedModel)
 	default:
@@ -797,6 +807,13 @@ func resolveTokenRouterAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *int
 	return resolveAPIKeyConfig(cfg.TokenRouterKey, auth)
 }
 
+func resolveOrcaRouterAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalconfig.OrcaRouterKey {
+	if cfg == nil {
+		return nil
+	}
+	return resolveAPIKeyConfig(cfg.OrcaRouterKey, auth)
+}
+
 func resolveVertexAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalconfig.VertexCompatKey {
 	if cfg == nil {
 		return nil
@@ -862,6 +879,14 @@ func resolveUpstreamModelForZenAPIKey(cfg *internalconfig.Config, auth *Auth, re
 
 func resolveUpstreamModelForTokenRouterAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
 	entry := resolveTokenRouterAPIKeyConfig(cfg, auth)
+	if entry == nil {
+		return ""
+	}
+	return resolveModelAliasFromConfigModels(requestedModel, asModelAliasEntries(entry.Models))
+}
+
+func resolveUpstreamModelForOrcaRouterAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
+	entry := resolveOrcaRouterAPIKeyConfig(cfg, auth)
 	if entry == nil {
 		return ""
 	}

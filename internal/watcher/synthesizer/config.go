@@ -58,6 +58,8 @@ func (s *ConfigSynthesizer) Synthesize(ctx *SynthesisContext) ([]*coreauth.Auth,
 	out = append(out, s.synthesizeZenKeys(ctx)...)
 	// TokenRouter API Keys
 	out = append(out, s.synthesizeTokenRouterKeys(ctx)...)
+	// OrcaRouter API Keys
+	out = append(out, s.synthesizeOrcaRouterKeys(ctx)...)
 	// OpenAI-compat
 	out = append(out, s.synthesizeOpenAICompat(ctx)...)
 	// Vertex-compat
@@ -215,6 +217,11 @@ func (s *ConfigSynthesizer) synthesizeZenKeys(ctx *SynthesisContext) []*coreauth
 // synthesizeTokenRouterKeys creates Auth entries for TokenRouter API keys.
 func (s *ConfigSynthesizer) synthesizeTokenRouterKeys(ctx *SynthesisContext) []*coreauth.Auth {
 	return s.synthesizeCodexStyleKeys(ctx, ctx.Config.TokenRouterKey, "tokenrouter")
+}
+
+// synthesizeOrcaRouterKeys creates Auth entries for OrcaRouter API keys.
+func (s *ConfigSynthesizer) synthesizeOrcaRouterKeys(ctx *SynthesisContext) []*coreauth.Auth {
+	return s.synthesizeCodexStyleKeys(ctx, ctx.Config.OrcaRouterKey, "orcarouter")
 }
 
 func (s *ConfigSynthesizer) synthesizeCodexStyleKeys(ctx *SynthesisContext, entries []config.CodexKey, provider string) []*coreauth.Auth {
