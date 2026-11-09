@@ -33,18 +33,18 @@ func claudeReplayTestAuth(baseURL string) *shinwayauth.Auth {
 
 func claudeReplayTestRequest(payload []byte, sessionID string, isCompat bool, source sdktranslator.Format) (shinwayexecutor.Request, shinwayexecutor.Options) {
 	return shinwayexecutor.Request{
-			Model:   "claude-synthetic-4772",
-			Payload: payload,
-			Metadata: map[string]any{
-				claudeReplayResolvedModelInfoKey: &registry.ModelInfo{IsCompat: isCompat},
-			},
-		}, shinwayexecutor.Options{
-			SourceFormat: source,
-			Headers:      http.Header{"X-Shinway-Replay-Test": []string{"isolated"}},
-			Metadata: map[string]any{
-				shinwayexecutor.ExecutionSessionMetadataKey: sessionID,
-			},
-		}
+		Model:   "claude-synthetic-4772",
+		Payload: payload,
+		Metadata: map[string]any{
+			claudeReplayResolvedModelInfoKey: &registry.ModelInfo{IsCompat: isCompat},
+		},
+	}, shinwayexecutor.Options{
+		SourceFormat: source,
+		Headers:      http.Header{"X-Shinway-Replay-Test": []string{"isolated"}},
+		Metadata: map[string]any{
+			shinwayexecutor.ExecutionSessionMetadataKey: sessionID,
+		},
+	}
 }
 
 func TestClaudeThinkingReplayEnabledRequiresCompatClaudeAPIKey(t *testing.T) {
