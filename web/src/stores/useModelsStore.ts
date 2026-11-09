@@ -25,6 +25,9 @@ interface ModelsState {
   isCacheValid: (apiBase: string, apiKey?: string) => boolean;
 }
 
+/** Monotonic attempt counter so stale responses cannot overwrite fresh state. */
+let fetchAttempt = 0;
+
 export const useModelsStore = create<ModelsState>((set, get) => ({
   models: [],
   loading: false,
@@ -41,12 +44,19 @@ export const useModelsStore = create<ModelsState>((set, get) => ({
       return cache.data;
     }
 
+    const attempt = (fetchAttempt += 1);
     set({ loading: true, error: null });
 
     try {
       const list = await modelsApi.fetchModels(apiBase, apiKeyScope || undefined);
-      const now = Date.now();
 
+      // A newer fetch (or a cache clear) superseded this one: drop the result
+      // instead of overwriting fresher state with a stale response.
+      if (attempt !== fetchAttempt) {
+        return list;
+      }
+
+      const now = Date.now();
       set({
         models: list,
         loading: false,
@@ -61,17 +71,29 @@ export const useModelsStore = create<ModelsState>((set, get) => ({
           : typeof error === 'string'
             ? error
             : 'Failed to fetch models';
-      set({
-        error: message,
-        loading: false,
-        models: [],
-      });
+      if (attempt === fetchAttempt) {
+        set({
+          error: message,
+          loading: false,
+          models: [],
+        });
+      }
       throw error;
     }
   },
 
   clearCache: () => {
-    set({ cache: null, models: [] });
+    // Reset the whole fetch lifecycle, not just the cache.
+    //
+    // The cache and the in-flight lifecycle are driven by independent fields,
+    // so clearing only `cache`/`models` could leave `loading` and `error`
+    // describing a request whose data had just been thrown away (e.g. a
+    // logout or reconnect while a fetch was in flight, whose late response
+    // then wrote a stale error). Bumping the attempt counter invalidates any
+    // in-flight response, and clearing the flags returns the machine to a
+    // consistent idle state.
+    fetchAttempt += 1;
+    set({ cache: null, models: [], loading: false, error: null });
   },
 
   isCacheValid: (apiBase, apiKey) => {

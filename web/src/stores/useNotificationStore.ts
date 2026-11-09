@@ -81,20 +81,26 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   },
 
   hideConfirmation: () => {
-    set((state) => ({
+    // Reset loading as well. Leaving `isLoading: true` behind meant a dialog
+    // closed mid-action (e.g. by a logout or a route change) kept its loading
+    // state, so the *next* confirmation opened already spinning and the cancel
+    // button stayed permanently disabled.
+    set({
       confirmation: {
-        ...state.confirmation,
         isOpen: false,
-        options: null, // Cleanup
+        isLoading: false,
+        options: null,
       },
-    }));
+    });
   },
 
   setConfirmationLoading: (loading) => {
     set((state) => ({
       confirmation: {
         ...state.confirmation,
-        isLoading: loading,
+        // A late `finally` from a superseded confirmation must not flip the
+        // currently-open dialog into a loading state it does not own.
+        isLoading: state.confirmation.isOpen ? loading : false,
       },
     }));
   },

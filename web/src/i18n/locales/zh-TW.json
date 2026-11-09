@@ -1371,7 +1371,8 @@
     "login_failed": "登入失敗",
     "commercial_mode_restart_required": "商業模式開關已變更，請重啟服務後生效",
     "copy_failed": "複製失敗",
-    "link_copied": "已複製"
+    "link_copied": "已複製",
+    "action_failed": "操作失敗"
   },
   "language": {
     "switch": "語言",

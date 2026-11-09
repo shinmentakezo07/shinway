@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { modelsApi } from '@/services/api';
 import { buildHeaderObject } from '@/utils/headers';
 import { getErrorMessage } from '@/utils/helpers';
+import { asyncFlags, asyncReducer, initialAsyncState } from '@/utils/asyncState';
 import { withZenIdentityHeaders } from '../../zen';
 import type { ModelInfo } from '@/utils/models';
 import type { ApiKeyEntryInput, ProviderBrand } from '../../types';
@@ -42,19 +43,33 @@ export interface UseModelDiscoveryResult {
   reset: () => void;
 }
 
+/**
+ * Model discovery lifecycle.
+ *
+ * Previously this was four independent flags (`loading`, `error`, `models`,
+ * `hasFetched`) set in scattered branches. Illegal combinations were
+ * representable — notably a superseded request writing a stale `success` or
+ * `error` over a newer attempt (`loading && error`, or stale models shown
+ * for changed credentials). It is now a single explicit state machine via
+ * `asyncReducer`, with an attempt token that discards late responses.
+ *
+ * The returned shape is unchanged so callers need no migration.
+ */
 export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscoveryResult {
   const { brand, baseUrl, formHeaders, apiKeyEntries, apiKey, fallbackApiKey, authIndex } = args;
 
   const available = isModelDiscoveryBrand(brand);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [hasFetched, setHasFetched] = useState(false);
+  const [state, dispatch] = useReducer(
+    asyncReducer<ModelInfo[]>,
+    undefined,
+    initialAsyncState<ModelInfo[]>
+  );
+  const attemptRef = useRef(0);
 
-  const fetch = useCallback(async () => {
+  const fetchModels = useCallback(async () => {
     if (!available) return;
-    setLoading(true);
-    setError(null);
+    const attempt = (attemptRef.current += 1);
+    dispatch({ type: 'start' });
     try {
       const baseHeaders =
         brand === 'zen'
@@ -134,22 +149,22 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           }
         }
       }
-      setModels(next ?? []);
-      setHasFetched(true);
+      // A newer attempt (or a reset from changed inputs) superseded this one.
+      // Discard the result rather than writing stale data over fresh state.
+      if (attempt !== attemptRef.current) return;
+      dispatch({ type: 'success', data: next ?? [] });
     } catch (err) {
-      setModels([]);
-      setError(getErrorMessage(err) || 'Failed to fetch models');
-      setHasFetched(true);
-    } finally {
-      setLoading(false);
+      if (attempt !== attemptRef.current) return;
+      dispatch({
+        type: 'failure',
+        error: getErrorMessage(err) || 'Failed to fetch models',
+      });
     }
   }, [available, apiKey, apiKeyEntries, authIndex, baseUrl, brand, fallbackApiKey, formHeaders]);
 
   const reset = useCallback(() => {
-    setModels([]);
-    setError(null);
-    setLoading(false);
-    setHasFetched(false);
+    attemptRef.current += 1;
+    dispatch({ type: 'reset' });
   }, []);
 
   const inputSignature = useMemo(() => {
@@ -174,5 +189,14 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
     reset();
   }, [inputSignature, reset]);
 
-  return { available, loading, error, models, hasFetched, fetch, reset };
+  const flags = asyncFlags(state);
+  return {
+    available,
+    loading: flags.isLoading,
+    error: state.error,
+    models: state.data ?? [],
+    hasFetched: state.settled,
+    fetch: fetchModels,
+    reset,
+  };
 }

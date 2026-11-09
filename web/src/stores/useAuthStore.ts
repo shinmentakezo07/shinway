@@ -45,6 +45,11 @@ export const useAuthStore = create<AuthStoreState>()(
       restoreSession: () => {
         if (restoreSessionPromise) return restoreSessionPromise;
 
+        // Note: the promise is memoized so concurrent callers (StrictMode,
+        // multiple mounts) share one attempt. It is cleared by `logout`;
+        // because it resolves to a boolean and never rejects, a failed restore
+        // is still cached for the page's lifetime — callers that need to retry
+        // must invoke `checkAuth` instead.
         restoreSessionPromise = (async () => {
           obfuscatedStorage.migratePlaintextKeys(['apiBase', 'apiUrl', 'managementKey']);
 
@@ -128,7 +133,18 @@ export const useAuthStore = create<AuthStoreState>()(
             localStorage.removeItem('isLoggedIn');
           }
         } catch (error: unknown) {
-          set({ connectionStatus: 'error' });
+          // A failed login must not leave the previous session's credentials or
+          // `isAuthenticated` in place: without this, the UI can keep rendering
+          // authenticated routes against credentials the backend just rejected,
+          // and ProtectedRoute will not redirect because `isAuthenticated`
+          // is still true.
+          set({
+            isAuthenticated: false,
+            connectionStatus: 'error',
+            serverVersion: null,
+            serverBuildDate: null,
+            supportsPlugin: false,
+          });
           throw error;
         }
       },

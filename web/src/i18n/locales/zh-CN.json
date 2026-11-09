@@ -1345,7 +1345,8 @@
     "login_failed": "登录失败",
     "commercial_mode_restart_required": "商业模式开关已变更，请重启服务后生效",
     "copy_failed": "复制失败",
-    "link_copied": "已复制"
+    "link_copied": "已复制",
+    "action_failed": "操作失败"
   },
   "language": {
     "switch": "语言",

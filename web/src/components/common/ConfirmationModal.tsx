@@ -2,12 +2,14 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useNotificationStore } from '@/stores';
+import { getErrorMessage } from '@/utils/helpers';
 
 export function ConfirmationModal() {
   const { t } = useTranslation();
   const confirmation = useNotificationStore((state) => state.confirmation);
   const hideConfirmation = useNotificationStore((state) => state.hideConfirmation);
   const setConfirmationLoading = useNotificationStore((state) => state.setConfirmationLoading);
+  const showNotification = useNotificationStore((state) => state.showNotification);
 
   const { isOpen, isLoading, options } = confirmation;
 
@@ -31,9 +33,12 @@ export function ConfirmationModal() {
       await onConfirm();
       hideConfirmation();
     } catch (error) {
+      // Keep the data/log trail for developers...
       console.error('Confirmation action failed:', error);
-      // Optional: show error notification here if needed,
-      // but usually the calling component handles specific errors.
+      // ...and tell the user. Previously the failure was swallowed here, so
+      // the dialog just sat there with no feedback after the button stopped
+      // spinning, leaving people unsure whether the action ran.
+      showNotification(getErrorMessage(error, t('notification.action_failed')), 'error');
     } finally {
       setConfirmationLoading(false);
     }
