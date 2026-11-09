@@ -76,6 +76,9 @@ func (w *ResponseWriterWrapper) Write(data []byte) (int, error) {
 	// Ensure headers are captured before first write
 	// This is critical because Write() may trigger WriteHeader() internally
 	w.ensureHeadersCaptured()
+	// gin's implicit header write bypasses this wrapper's WriteHeader, so detect
+	// streaming before the first chunk is committed to avoid buffering SSE bodies.
+	w.startStreamingLogIfNeeded(0)
 
 	// CRITICAL: Write to client first (zero latency)
 	n, err := w.ResponseWriter.Write(data)
@@ -102,6 +105,11 @@ func (w *ResponseWriterWrapper) Write(data []byte) (int, error) {
 }
 
 func (w *ResponseWriterWrapper) shouldBufferResponseBody() bool {
+	// Streaming responses must never be buffered: a long-lived stream would
+	// otherwise accumulate its entire body in memory until Finalize.
+	if w.isStreaming {
+		return false
+	}
 	if w.logger != nil && w.logger.IsEnabled() {
 		return true
 	}
@@ -124,6 +132,7 @@ func (w *ResponseWriterWrapper) shouldBufferResponseBody() bool {
 // bypass Write() and would be missing from request logs.
 func (w *ResponseWriterWrapper) WriteString(data string) (int, error) {
 	w.ensureHeadersCaptured()
+	w.startStreamingLogIfNeeded(0)
 
 	// CRITICAL: Write to client first (zero latency)
 	n, err := w.ResponseWriter.WriteString(data)
@@ -155,36 +164,56 @@ func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 
 	// Capture response headers using the new method
 	w.captureCurrentHeaders()
-
-	// Detect streaming based on Content-Type
-	contentType := w.ResponseWriter.Header().Get("Content-Type")
-	w.isStreaming = w.detectStreaming(contentType)
-
-	// If streaming, initialize streaming log writer
-	if w.isStreaming && w.logger.IsEnabled() {
-		streamWriter, err := w.logger.LogStreamingRequest(
-			w.requestInfo.URL,
-			w.requestInfo.Method,
-			w.requestInfo.Headers,
-			w.requestInfo.Body,
-			w.requestInfo.RequestID,
-		)
-		if err == nil {
-			w.streamWriter = streamWriter
-			w.chunkChannel = make(chan []byte, 100) // Buffered channel for async writes
-			doneChan := make(chan struct{})
-			w.streamDone = doneChan
-
-			// Start async chunk processor
-			go w.processStreamingChunks(doneChan)
-
-			// Write status immediately
-			_ = streamWriter.WriteStatus(statusCode, w.headers)
-		}
-	}
+	w.startStreamingLogIfNeeded(statusCode)
 
 	// Call original WriteHeader
 	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+// startStreamingLogIfNeeded detects a streaming response from the Content-Type
+// header and, when request logging is enabled, initializes the streaming log
+// writer. It is idempotent and safe to call on every write.
+func (w *ResponseWriterWrapper) startStreamingLogIfNeeded(statusCode int) {
+	if w.streamWriter != nil {
+		return
+	}
+	if !w.isStreaming {
+		w.isStreaming = w.detectStreaming(w.ResponseWriter.Header().Get("Content-Type"))
+	}
+	if !w.isStreaming || w.logger == nil || !w.logger.IsEnabled() || w.requestInfo == nil {
+		return
+	}
+
+	streamWriter, err := w.logger.LogStreamingRequest(
+		w.requestInfo.URL,
+		w.requestInfo.Method,
+		w.requestInfo.Headers,
+		w.requestInfo.Body,
+		w.requestInfo.RequestID,
+	)
+	if err != nil {
+		return
+	}
+
+	w.streamWriter = streamWriter
+	w.chunkChannel = make(chan []byte, 100) // Buffered channel for async writes
+	doneChan := make(chan struct{})
+	w.streamDone = doneChan
+
+	// Start async chunk processor
+	go w.processStreamingChunks(doneChan)
+
+	if statusCode <= 0 {
+		if statusWriter, ok := w.ResponseWriter.(interface{ Status() int }); ok && statusWriter != nil {
+			statusCode = statusWriter.Status()
+		}
+		if statusCode <= 0 {
+			statusCode = http.StatusOK
+		}
+	}
+
+	// Write status immediately
+	_ = streamWriter.WriteStatus(statusCode, w.headers)
 }
 
 // ensureHeadersCaptured is a helper function to make sure response headers are captured.

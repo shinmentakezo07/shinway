@@ -237,3 +237,23 @@ func TestForwardResponsesStreamDropsIncompleteTrailingDataChunkOnFlush(t *testin
 		t.Fatalf("expected incomplete trailing data to be dropped on flush.\nGot: %q", got)
 	}
 }
+
+func TestResponsesSSEFrameLenSupportsAllLineTerminators(t *testing.T) {
+	cases := []struct {
+		name  string
+		chunk string
+		want  int
+	}{
+		{"lf", "data: a\n\ndata: b\n\n", len("data: a\n\n")},
+		{"crlf", "data: a\r\n\r\ndata: b\r\n\r\n", len("data: a\r\n\r\n")},
+		{"cr", "data: a\r\rdata: b\r\r", len("data: a\r\r")},
+		{"incomplete", "data: a\n", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := responsesSSEFrameLen([]byte(tc.chunk)); got != tc.want {
+				t.Fatalf("frame len = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}

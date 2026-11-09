@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -152,6 +153,41 @@ func TestFinalizeStreamingWritesAPIWebsocketTimeline(t *testing.T) {
 	if !streamWriter.closed {
 		t.Fatal("expected stream writer to be closed")
 	}
+}
+
+func TestWrapperDetectsStreamingOnImplicitWrite(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	wrapper := NewResponseWriterWrapper(c.Writer, &testRequestLogger{enabled: true}, &RequestInfo{
+		URL:     "/v1/chat/completions",
+		Method:  http.MethodPost,
+		Headers: map[string][]string{"Content-Type": {"application/json"}},
+	})
+	c.Writer = wrapper
+	c.Header("Content-Type", "text/event-stream")
+
+	if _, err := c.Writer.Write([]byte("data: {}\n\n")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if !wrapper.isStreaming {
+		t.Fatal("expected implicit write to detect a streaming response")
+	}
+	if wrapper.streamWriter == nil {
+		t.Fatal("expected streaming log writer to be initialized")
+	}
+	if wrapper.body.Len() != 0 {
+		t.Fatalf("streaming response must not be buffered, got %d bytes", wrapper.body.Len())
+	}
+	if got := recorder.Body.String(); got != "data: {}\n\n" {
+		t.Fatalf("client body = %q", got)
+	}
+
+	close(wrapper.chunkChannel)
+	<-wrapper.streamDone
 }
 
 type testRequestLogger struct {

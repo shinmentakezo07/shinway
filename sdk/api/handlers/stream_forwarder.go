@@ -29,6 +29,24 @@ type StreamForwardOptions struct {
 	WriteKeepAlive func()
 }
 
+// PendingStreamError returns a terminal error that is already buffered on errs
+// without blocking. Callers use it when the data channel closes so that an
+// upstream failure is not reported as a successful, empty stream.
+func PendingStreamError(errs <-chan *interfaces.ErrorMessage) (*interfaces.ErrorMessage, bool) {
+	if errs == nil {
+		return nil, false
+	}
+	select {
+	case errMsg, ok := <-errs:
+		if !ok {
+			return nil, false
+		}
+		return errMsg, true
+	default:
+		return nil, false
+	}
+}
+
 func (h *BaseAPIHandler) ForwardStream(c *gin.Context, flusher http.Flusher, cancel func(error), data <-chan []byte, errs <-chan *interfaces.ErrorMessage, opts StreamForwardOptions) {
 	if c == nil {
 		return
@@ -98,6 +116,9 @@ func (h *BaseAPIHandler) ForwardStream(c *gin.Context, flusher http.Flusher, can
 			flusher.Flush()
 		case errMsg, ok := <-errs:
 			if !ok {
+				// Disable this case instead of continuing: a closed channel is
+				// always ready, so continuing would busy-spin until data closes.
+				errs = nil
 				continue
 			}
 			if errMsg != nil {

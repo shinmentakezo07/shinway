@@ -223,21 +223,21 @@ func responsesSSEFrameLen(chunk []byte) int {
 	if len(chunk) == 0 {
 		return 0
 	}
-	lf := bytes.Index(chunk, []byte("\n\n"))
-	crlf := bytes.Index(chunk, []byte("\r\n\r\n"))
-	switch {
-	case lf < 0:
-		if crlf < 0 {
-			return 0
+	// SSE treats CRLF, LF, and CR as line terminators, so a blank line can be
+	// "\n\n", "\r\n\r\n", or "\r\r". Take the earliest delimiter.
+	frameLen := 0
+	consider := func(index, width int) {
+		if index < 0 {
+			return
 		}
-		return crlf + 4
-	case crlf < 0:
-		return lf + 2
-	case lf < crlf:
-		return lf + 2
-	default:
-		return crlf + 4
+		if length := index + width; frameLen == 0 || length < frameLen {
+			frameLen = length
+		}
 	}
+	consider(bytes.Index(chunk, []byte("\n\n")), 2)
+	consider(bytes.Index(chunk, []byte("\r\n\r\n")), 4)
+	consider(bytes.Index(chunk, []byte("\r\r")), 2)
+	return frameLen
 }
 
 func responsesSSENeedsMoreData(chunk []byte) bool {
@@ -517,6 +517,15 @@ func (h *OpenAIResponsesAPIHandler) handleStreamingResponse(c *gin.Context, rawJ
 			return
 		case chunk, ok := <-dataChan:
 			if !ok {
+				if errMsg, okPending := handlers.PendingStreamError(errChan); okPending {
+					h.WriteErrorResponse(c, errMsg)
+					if errMsg != nil {
+						cliCancel(errMsg.Error)
+					} else {
+						cliCancel(nil)
+					}
+					return
+				}
 				// Stream closed without data? Send headers and done.
 				setSSEHeaders()
 				handlers.WriteUpstreamHeaders(c.Writer.Header(), upstreamHeaders)
