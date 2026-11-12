@@ -229,7 +229,7 @@ func (w *Watcher) authUpdateKey(update AuthUpdate, ts int64) string {
 
 func (w *Watcher) dispatchLoop(ctx context.Context) {
 	for {
-		batch, ok := w.nextPendingBatch(ctx)
+		batch, keys, ok := w.nextPendingBatch(ctx)
 		if !ok {
 			return
 		}
@@ -241,35 +241,74 @@ func (w *Watcher) dispatchLoop(ctx context.Context) {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-		for _, update := range batch {
-			select {
-			case queue <- update:
-			case <-ctx.Done():
-				return
-			}
+		if !w.deliverBatch(ctx, queue, batch) {
+			return
 		}
+		// Only drop the queued updates once the consumer accepted them, so a
+		// temporarily unavailable queue cannot silently discard auth changes.
+		w.ackPendingBatch(keys)
 	}
 }
 
-func (w *Watcher) nextPendingBatch(ctx context.Context) ([]AuthUpdate, bool) {
+// nextPendingBatch returns the currently pending updates without removing them.
+func (w *Watcher) nextPendingBatch(ctx context.Context) ([]AuthUpdate, []string, bool) {
 	w.dispatchMu.Lock()
 	defer w.dispatchMu.Unlock()
 	for len(w.pendingOrder) == 0 {
 		if ctx.Err() != nil {
-			return nil, false
+			return nil, nil, false
 		}
 		w.dispatchCond.Wait()
 		if ctx.Err() != nil {
-			return nil, false
+			return nil, nil, false
 		}
 	}
 	batch := make([]AuthUpdate, 0, len(w.pendingOrder))
+	keys := make([]string, 0, len(w.pendingOrder))
 	for _, key := range w.pendingOrder {
 		batch = append(batch, w.pendingUpdates[key])
-		delete(w.pendingUpdates, key)
+		keys = append(keys, key)
 	}
-	w.pendingOrder = w.pendingOrder[:0]
-	return batch, true
+	return batch, keys, true
+}
+
+// deliverBatch sends every update to the queue. It reports false when the
+// context was cancelled before the batch was fully delivered.
+func (w *Watcher) deliverBatch(ctx context.Context, queue chan<- AuthUpdate, batch []AuthUpdate) bool {
+	for _, update := range batch {
+		select {
+		case queue <- update:
+		case <-ctx.Done():
+			return false
+		}
+	}
+	return true
+}
+
+// ackPendingBatch removes the delivered keys, keeping any update that was
+// re-queued while the batch was in flight.
+func (w *Watcher) ackPendingBatch(keys []string) {
+	w.dispatchMu.Lock()
+	defer w.dispatchMu.Unlock()
+	remaining := w.pendingOrder[:0]
+	for _, key := range w.pendingOrder {
+		delivered := false
+		for _, acked := range keys {
+			if acked == key {
+				delivered = true
+				break
+			}
+		}
+		if delivered {
+			delete(w.pendingUpdates, key)
+			continue
+		}
+		remaining = append(remaining, key)
+	}
+	w.pendingOrder = remaining
+	if len(w.pendingOrder) > 0 && w.dispatchCond != nil {
+		w.dispatchCond.Signal()
+	}
 }
 
 func (w *Watcher) getAuthQueue() chan<- AuthUpdate {

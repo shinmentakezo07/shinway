@@ -3,6 +3,7 @@ package logging
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -72,6 +73,9 @@ type FileStreamingLogWriter struct {
 
 	// apiResponseTimestamp captures when the API response was received.
 	apiResponseTimestamp time.Time
+
+	// truncationNote records that the captured response stream is incomplete.
+	truncationNote string
 }
 
 // WriteChunkAsync writes a response chunk asynchronously (non-blocking).
@@ -219,6 +223,7 @@ func (w *FileStreamingLogWriter) Close() error {
 		return nil
 	}
 
+	w.appendTruncationNote()
 	logFile, errOpen := os.OpenFile(w.logFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if errOpen != nil {
 		w.cleanupTempFiles()
@@ -235,6 +240,34 @@ func (w *FileStreamingLogWriter) Close() error {
 
 	w.cleanupTempFiles()
 	return writeErr
+}
+
+// WriteTruncationNote records that the captured response stream is incomplete.
+// The note is appended to the logged response body so truncation is visible.
+func (w *FileStreamingLogWriter) WriteTruncationNote(note string) error {
+	if w == nil {
+		return nil
+	}
+	w.truncationNote = note
+	return nil
+}
+
+// appendTruncationNote writes the truncation note to the end of the spooled body.
+func (w *FileStreamingLogWriter) appendTruncationNote() {
+	if w == nil || w.truncationNote == "" || w.responseBodyPath == "" {
+		return
+	}
+	file, errOpen := os.OpenFile(w.responseBodyPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if errOpen != nil {
+		log.WithError(errOpen).Warn("failed to append truncation note to response body")
+		return
+	}
+	if _, errWrite := io.WriteString(file, "\n"+w.truncationNote+"\n"); errWrite != nil {
+		log.WithError(errWrite).Warn("failed to write truncation note to response body")
+	}
+	if errClose := file.Close(); errClose != nil {
+		log.WithError(errClose).Warn("failed to close response body after truncation note")
+	}
 }
 
 // asyncWriter runs in a goroutine to buffer chunks from the channel.

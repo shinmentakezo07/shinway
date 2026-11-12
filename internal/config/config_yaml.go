@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/shinmentakezo07/shinway/v7/internal/misc"
 )
 
 // SaveConfigPreserveComments writes the config back to YAML while preserving existing comments
@@ -60,12 +62,7 @@ func SaveConfigPreserveComments(configFile string, cfg *Config) error {
 	mergeMappingPreserve(original.Content[0], generated.Content[0])
 	normalizeCollectionNodeStyles(original.Content[0])
 
-	// Write back.
-	f, err := os.Create(configFile)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
+	// Write back atomically so a crash cannot truncate the live config.
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
@@ -76,9 +73,7 @@ func SaveConfigPreserveComments(configFile string, cfg *Config) error {
 	if err = enc.Close(); err != nil {
 		return err
 	}
-	data = NormalizeCommentIndentation(buf.Bytes())
-	_, err = f.Write(data)
-	return err
+	return misc.WriteFileAtomic(configFile, NormalizeCommentIndentation(buf.Bytes()), 0o600)
 }
 
 // SaveConfigPreserveCommentsUpdateNestedScalar updates a nested scalar key path like ["a","b"]
@@ -113,11 +108,6 @@ func SaveConfigPreserveCommentsUpdateNestedScalar(configFile string, path []stri
 			node = next
 		}
 	}
-	f, err := os.Create(configFile)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
@@ -128,9 +118,7 @@ func SaveConfigPreserveCommentsUpdateNestedScalar(configFile string, path []stri
 	if err = enc.Close(); err != nil {
 		return err
 	}
-	data = NormalizeCommentIndentation(buf.Bytes())
-	_, err = f.Write(data)
-	return err
+	return misc.WriteFileAtomic(configFile, NormalizeCommentIndentation(buf.Bytes()), 0o600)
 }
 
 // NormalizeCommentIndentation removes indentation from standalone YAML comment lines to keep them left aligned.

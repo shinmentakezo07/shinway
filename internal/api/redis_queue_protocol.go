@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,17 @@ import (
 const (
 	redisUsageChannel  = "usage"
 	redisErrorsChannel = "errors"
+
+	// redisMaxArrayElements bounds the element count accepted in a RESP array
+	// header. Frames are parsed before authentication, so an attacker-supplied
+	// count must never drive allocation directly.
+	redisMaxArrayElements = 4096
+
+	// redisMaxBulkLength bounds a single RESP bulk string payload.
+	redisMaxBulkLength = 64 << 20
+
+	// redisMaxLineLength bounds a single RESP line (including command arguments).
+	redisMaxLineLength = 64 << 10
 )
 
 type redisSubscriptionCommand struct {
@@ -426,6 +438,9 @@ func readRESPArray(reader *bufio.Reader) ([]string, error) {
 	if errParse != nil || count < 0 {
 		return nil, fmt.Errorf("protocol error")
 	}
+	if count > redisMaxArrayElements {
+		return nil, fmt.Errorf("protocol error: array length %d exceeds limit", count)
+	}
 	args := make([]string, 0, count)
 	for i := 0; i < count; i++ {
 		value, errString := readRESPString(reader)
@@ -464,6 +479,9 @@ func readRESPBulkString(reader *bufio.Reader) (string, error) {
 	if length < 0 {
 		return "", nil
 	}
+	if length > redisMaxBulkLength {
+		return "", fmt.Errorf("protocol error: bulk length %d exceeds limit", length)
+	}
 	buf := make([]byte, length+2)
 	if _, errRead := io.ReadFull(reader, buf); errRead != nil {
 		return "", errRead
@@ -475,13 +493,24 @@ func readRESPBulkString(reader *bufio.Reader) (string, error) {
 }
 
 func readRESPLine(reader *bufio.Reader) (string, error) {
-	line, errRead := reader.ReadString('\n')
-	if errRead != nil {
+	line := make([]byte, 0, 64)
+	for {
+		chunk, errRead := reader.ReadSlice('\n')
+		line = append(line, chunk...)
+		if len(line) > redisMaxLineLength {
+			return "", fmt.Errorf("protocol error: line length exceeds limit")
+		}
+		if errRead == nil {
+			break
+		}
+		if errors.Is(errRead, bufio.ErrBufferFull) {
+			continue
+		}
 		return "", errRead
 	}
-	line = strings.TrimSuffix(line, "\n")
-	line = strings.TrimSuffix(line, "\r")
-	return line, nil
+	line = bytes.TrimSuffix(line, []byte("\n"))
+	line = bytes.TrimSuffix(line, []byte("\r"))
+	return string(line), nil
 }
 
 func writeRedisSimpleString(writer *bufio.Writer, value string) error {

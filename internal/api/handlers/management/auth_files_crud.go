@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shinmentakezo07/shinway/v7/internal/misc"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	"github.com/shinmentakezo07/shinway/v7/internal/watcher/synthesizer"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
@@ -269,7 +270,7 @@ func (h *Handler) writeAuthFile(ctx context.Context, name string, data []byte) e
 	if err != nil {
 		return err
 	}
-	if errWrite := os.WriteFile(dst, data, 0o600); errWrite != nil {
+	if errWrite := misc.WriteFileAtomic(dst, data, 0o600); errWrite != nil {
 		return fmt.Errorf("failed to write file: %w", errWrite)
 	}
 	if err := h.upsertAuthRecord(ctx, auth); err != nil {

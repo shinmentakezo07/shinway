@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/home"
+	"github.com/shinmentakezo07/shinway/v7/internal/util"
 )
 
 type homeRequestLogClient interface {
@@ -38,8 +39,13 @@ func cloneHeaders(headers map[string][]string) map[string][]string {
 			out[key] = nil
 			continue
 		}
+		// Forwarded headers must be masked the same way as the on-disk log
+		// sections: Authorization, API keys and tokens never leave the process
+		// in clear text.
 		copied := make([]string, len(values))
-		copy(copied, values)
+		for index, value := range values {
+			copied[index] = util.MaskSensitiveHeaderValue(key, value)
+		}
 		out[key] = copied
 	}
 	if len(out) == 0 {
@@ -49,7 +55,7 @@ func cloneHeaders(headers map[string][]string) map[string][]string {
 }
 
 func (l *FileRequestLogger) forwardRequestLogToHome(ctx context.Context, headers map[string][]string, requestID string, logText string) error {
-	if l == nil || !l.homeEnabled {
+	if l == nil || !l.homeEnabled.Load() {
 		return nil
 	}
 	client := currentHomeRequestLogClient()
@@ -77,7 +83,7 @@ func (l *FileRequestLogger) SetHomeEnabled(enabled bool) {
 	if l == nil {
 		return
 	}
-	l.homeEnabled = enabled
+	l.homeEnabled.Store(enabled)
 }
 
 type homeStreamingLogWriter struct {
@@ -101,6 +107,7 @@ type homeStreamingLogWriter struct {
 	requestID        string
 	apiResponseTS    time.Time
 	firstChunkTS     time.Time
+	truncationNote   string
 }
 
 func newHomeStreamingLogWriter(url, method string, headers map[string][]string, body []byte, requestID string) *homeStreamingLogWriter {
@@ -197,6 +204,15 @@ func (w *homeStreamingLogWriter) SetFirstChunkTimestamp(timestamp time.Time) {
 	}
 }
 
+// WriteTruncationNote records that the captured response stream is incomplete.
+func (w *homeStreamingLogWriter) WriteTruncationNote(note string) error {
+	if w == nil {
+		return nil
+	}
+	w.truncationNote = note
+	return nil
+}
+
 func (w *homeStreamingLogWriter) Close() error {
 	if w == nil {
 		return nil
@@ -214,6 +230,9 @@ func (w *homeStreamingLogWriter) Close() error {
 	}
 
 	responsePayload := w.responseBody.Bytes()
+	if w.truncationNote != "" {
+		responsePayload = append(append(append([]byte(nil), responsePayload...), '\n'), []byte(w.truncationNote+"\n")...)
+	}
 
 	var buf bytes.Buffer
 	upstreamTransport := inferUpstreamTransport(w.apiRequest, nil, w.apiResponse, nil, w.apiWebsocketTime, nil, nil)

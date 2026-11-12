@@ -6,6 +6,7 @@ package logging
 import (
 	"fmt"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/shinmentakezo07/shinway/v7/internal/interfaces"
@@ -135,7 +136,8 @@ type StreamingLogWriter interface {
 // It provides file-based logging functionality for HTTP requests and responses.
 type FileRequestLogger struct {
 	// enabled indicates whether request logging is currently enabled.
-	enabled bool
+	// enabled is written by config reloads and read by request goroutines.
+	enabled atomic.Bool
 
 	// logsDir is the directory where log files are stored.
 	logsDir string
@@ -143,7 +145,8 @@ type FileRequestLogger struct {
 	// errorLogsMaxFiles limits the number of error log files retained.
 	errorLogsMaxFiles int
 
-	homeEnabled bool
+	// homeEnabled is written by config reloads and read by request goroutines.
+	homeEnabled atomic.Bool
 }
 
 // NewFileRequestLogger creates a new file-based request logger.
@@ -165,12 +168,12 @@ func NewFileRequestLogger(enabled bool, logsDir string, configDir string, errorL
 			logsDir = filepath.Join(configDir, logsDir)
 		}
 	}
-	return &FileRequestLogger{
-		enabled:           enabled,
+	logger := &FileRequestLogger{
 		logsDir:           logsDir,
 		errorLogsMaxFiles: errorLogsMaxFiles,
-		homeEnabled:       false,
 	}
+	logger.enabled.Store(enabled)
+	return logger
 }
 
 // IsEnabled returns whether request logging is currently enabled.
@@ -178,7 +181,7 @@ func NewFileRequestLogger(enabled bool, logsDir string, configDir string, errorL
 // Returns:
 //   - bool: True if logging is enabled, false otherwise
 func (l *FileRequestLogger) IsEnabled() bool {
-	return l.enabled
+	return l.enabled.Load()
 }
 
 // SetEnabled updates the request logging enabled state.
@@ -187,7 +190,7 @@ func (l *FileRequestLogger) IsEnabled() bool {
 // Parameters:
 //   - enabled: Whether request logging should be enabled
 func (l *FileRequestLogger) SetEnabled(enabled bool) {
-	l.enabled = enabled
+	l.enabled.Store(enabled)
 }
 
 // SetErrorLogsMaxFiles updates the maximum number of error log files to retain.

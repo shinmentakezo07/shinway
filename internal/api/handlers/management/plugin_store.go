@@ -30,6 +30,10 @@ const (
 	// pluginReleaseFailureCacheTTL throttles retries after a failed lookup so a
 	// rate-limited or unreachable API is not hammered on every listing.
 	pluginReleaseFailureCacheTTL = 30 * time.Second
+	// pluginRegistryHTTPTimeout bounds registry traffic so an unresponsive
+	// source cannot hang a management request indefinitely. The client also
+	// streams plugin archives, so the bound allows for a slow download.
+	pluginRegistryHTTPTimeout = 5 * time.Minute
 )
 
 type pluginReleaseCacheEntry struct {
@@ -537,7 +541,7 @@ func (h *Handler) newPluginStoreClient(proxyURL string, registryURL string, stor
 	if httpClient != nil {
 		return pluginstore.Client{HTTPClient: httpClient, RegistryURL: registryURL, Auth: storeAuth}
 	}
-	client := &http.Client{}
+	client := &http.Client{Timeout: pluginRegistryHTTPTimeout}
 	if strings.TrimSpace(proxyURL) != "" {
 		util.SetProxy(&sdkconfig.SDKConfig{ProxyURL: strings.TrimSpace(proxyURL)}, client)
 	}

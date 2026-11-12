@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shinmentakezo07/shinway/v7/internal/credentialweight"
+	"github.com/shinmentakezo07/shinway/v7/internal/misc"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
 	coreauth "github.com/shinmentakezo07/shinway/v7/sdk/shinway/auth"
 )
@@ -174,7 +175,7 @@ func setSourceAuthFileDisabled(path string, disabled bool) error {
 	if errMarshal != nil {
 		return fmt.Errorf("marshal auth file: %w", errMarshal)
 	}
-	if errWrite := os.WriteFile(path, raw, 0o600); errWrite != nil {
+	if errWrite := misc.WriteFileAtomic(path, raw, 0o600); errWrite != nil {
 		return errWrite
 	}
 	return nil

@@ -88,24 +88,23 @@ func startCacheCleanup() {
 	}()
 }
 
-// purgeExpiredCaches removes caches with no valid (non-expired) entries.
+// purgeExpiredCaches removes expired entries.
+//
+// Empty buckets are deliberately kept: deleting a bucket that a concurrent
+// writer has already obtained from the sync.Map would strand that write in an
+// orphaned groupCache and silently drop the signature. Buckets are bounded by
+// the number of model groups, so retaining them costs nothing.
 func purgeExpiredCaches() {
 	now := time.Now()
 	signatureCache.Range(func(key, value any) bool {
 		sc := value.(*groupCache)
 		sc.mu.Lock()
-		// Remove expired entries
 		for k, entry := range sc.entries {
 			if now.Sub(entry.Timestamp) > SignatureCacheTTL {
 				delete(sc.entries, k)
 			}
 		}
-		isEmpty := len(sc.entries) == 0
 		sc.mu.Unlock()
-		// Remove cache bucket if empty
-		if isEmpty {
-			signatureCache.Delete(key)
-		}
 		return true
 	})
 	purgeExpiredCodexReasoningReplayCache(now)

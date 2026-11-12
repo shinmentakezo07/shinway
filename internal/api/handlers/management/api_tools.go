@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -115,6 +116,10 @@ func (h *Handler) APICall(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url"})
 		return
 	}
+	if errTarget := validateAPICallTarget(parsedURL); errTarget != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errTarget.Error()})
+		return
+	}
 
 	authIndex := firstNonEmptyString(body.AuthIndexSnake, body.AuthIndexCamel, body.AuthIndexPascal)
 	auth := h.authByIndex(authIndex)
@@ -200,6 +205,40 @@ func (h *Handler) APICall(c *gin.Context) {
 		Header:     resp.Header,
 		Body:       string(respBody),
 	})
+}
+
+// validateAPICallTarget rejects destinations that turn /api-call into a
+// credential exfiltration primitive. The handler substitutes $TOKEN$ with a
+// live provider token, so loopback, link-local (cloud metadata) and private
+// address literals are refused.
+func validateAPICallTarget(target *url.URL) error {
+	if target == nil {
+		return fmt.Errorf("invalid url")
+	}
+	switch strings.ToLower(target.Scheme) {
+	case "http", "https":
+	default:
+		return fmt.Errorf("url scheme must be http or https")
+	}
+	host := strings.TrimSuffix(strings.ToLower(target.Hostname()), ".")
+	if host == "" {
+		return fmt.Errorf("invalid url")
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return fmt.Errorf("url host is not allowed")
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil
+	}
+	// Loopback reaches this proxy's own management surface, and link-local
+	// reaches cloud metadata endpoints that hand out instance credentials.
+	// RFC1918/ULA ranges stay reachable on purpose: self-hosted providers
+	// (Ollama, vLLM, LM Studio) live there and are a supported target.
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return fmt.Errorf("url host is not allowed")
+	}
+	return nil
 }
 
 func firstNonEmptyString(values ...*string) string {

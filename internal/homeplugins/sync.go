@@ -68,6 +68,13 @@ type PluginInstallStatus struct {
 }
 
 const (
+	// pluginRegistryHTTPTimeout bounds plugin registry traffic. These clients
+	// are not managed by the server's request timeout, so an unresponsive
+	// registry would otherwise hang the sync goroutine indefinitely. The same
+	// client also streams plugin archives, so the bound has to accommodate a
+	// slow download rather than only a metadata call.
+	pluginRegistryHTTPTimeout = 5 * time.Minute
+
 	pluginTaskName         = "plugin-sync"
 	pluginDeleteTaskName   = "plugin-delete"
 	pluginTaskStatusOK     = "success"
@@ -801,7 +808,7 @@ func yamlMappingValue(node *yaml.Node, key string) *yaml.Node {
 }
 
 var newPluginStoreClient = func(cfg *config.Config) sdkpluginstore.Client {
-	client := &http.Client{}
+	client := &http.Client{Timeout: pluginRegistryHTTPTimeout}
 	var storeAuth []sdkpluginstore.AuthConfig
 	if cfg != nil && strings.TrimSpace(cfg.ProxyURL) != "" {
 		util.SetProxy(&sdkconfig.SDKConfig{ProxyURL: strings.TrimSpace(cfg.ProxyURL)}, client)
@@ -813,7 +820,7 @@ var newPluginStoreClient = func(cfg *config.Config) sdkpluginstore.Client {
 }
 
 var newResolvedPluginStoreClient = func(cfg *config.Config, auth []sdkpluginstore.ResolvedAuthConfig, expiresAt time.Time) sdkpluginstore.Client {
-	client := &http.Client{}
+	client := &http.Client{Timeout: pluginRegistryHTTPTimeout}
 	if cfg != nil && strings.TrimSpace(cfg.ProxyURL) != "" {
 		util.SetProxy(&sdkconfig.SDKConfig{ProxyURL: strings.TrimSpace(cfg.ProxyURL)}, client)
 	}

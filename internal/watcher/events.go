@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -45,6 +46,24 @@ func (w *Watcher) start(ctx context.Context) error {
 	return nil
 }
 
+// restoreWatches re-registers the config file and auth directory watches.
+// fsnotify binds a watch to the inode, so a rename or remove of a watched path
+// (atomic saves, editors, git checkouts) silently drops it. Without re-adding,
+// hot reload stops working until the process restarts.
+func (w *Watcher) restoreWatches() {
+	if w == nil || w.watcher == nil {
+		return
+	}
+	for _, path := range []string{w.configPath, w.authDir} {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		if errAdd := w.watcher.Add(path); errAdd != nil && !errors.Is(errAdd, fsnotify.ErrNonExistentWatch) {
+			log.WithError(errAdd).Debugf("failed to restore file watch for %s", path)
+		}
+	}
+}
+
 func (w *Watcher) processEvents(ctx context.Context) {
 	for {
 		select {
@@ -80,6 +99,10 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 
 	now := time.Now()
 	log.Debugf("file system event detected: %s %s", event.Op.String(), event.Name)
+
+	if event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+		w.restoreWatches()
+	}
 
 	// Handle config file changes
 	if isConfigEvent {
