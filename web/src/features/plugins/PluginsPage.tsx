@@ -20,11 +20,7 @@ import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { pluginsApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
-import type {
-  PluginConfigField,
-  PluginListEntry,
-  PluginListResponse,
-} from '@/types';
+import type { PluginConfigField, PluginListEntry, PluginListResponse } from '@/types';
 import {
   buildPluginConfigDraft,
   buildPluginConfigPatch,
@@ -78,6 +74,9 @@ export function PluginsPage() {
   const [deletingID, setDeletingID] = useState('');
   const [openingConfigID, setOpeningConfigID] = useState('');
   const configRequestSeq = useRef(0);
+  // List-generation token: a list snapshot that resolves after a
+  // toggle/install poll must not revert the newer runtime state.
+  const listGenRef = useRef(0);
 
   const connected = connectionStatus === 'connected';
 
@@ -88,19 +87,25 @@ export function PluginsPage() {
       return;
     }
 
+    const gen = ++listGenRef.current;
     setLoading(true);
     setError('');
     try {
       const plugins = await pluginsApi.list();
+      if (listGenRef.current !== gen) return; // superseded by a poll snapshot
       setData(plugins);
+      setError('');
     } catch (err: unknown) {
+      if (listGenRef.current !== gen) return; // superseded
       setError(
         hasStatus(err, 404)
           ? t('plugin_management.unsupported_backend')
           : getErrorMessage(err, t('plugin_management.load_failed'))
       );
     } finally {
-      setLoading(false);
+      if (listGenRef.current === gen) {
+        setLoading(false);
+      }
     }
   }, [connected, t]);
 
@@ -111,6 +116,9 @@ export function PluginsPage() {
           ? !response.pluginsEnabled || (item.registered && item.effectiveEnabled)
           : !item.effectiveEnabled
       );
+      // The poll snapshot reflects the mutation we just applied; it wins over
+      // any list request that started before it.
+      listGenRef.current++;
       setData(result.response);
       if (enabled && !result.response.pluginsEnabled) {
         return 'globalDisabled';

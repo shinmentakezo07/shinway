@@ -4,9 +4,16 @@ export type HeaderRefreshHandler = () => void | Promise<void>;
 
 let activeHeaderRefreshHandler: HeaderRefreshHandler | null = null;
 
-export const triggerHeaderRefresh = async () => {
-  if (!activeHeaderRefreshHandler) return;
+/**
+ * Runs the current page's refresh handler. Returns false when no handler is
+ * registered (e.g. the page was unmounted or never opted in), so callers like
+ * the header "Refresh all" button can distinguish "nothing to refresh" from a
+ * silent success.
+ */
+export const triggerHeaderRefresh = async (): Promise<boolean> => {
+  if (!activeHeaderRefreshHandler) return false;
   await activeHeaderRefreshHandler();
+  return true;
 };
 
 export const useHeaderRefresh = (handler?: HeaderRefreshHandler | null, enabled = true) => {

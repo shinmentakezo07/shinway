@@ -490,6 +490,11 @@ export function PluginStorePage() {
 
   const connected = connectionStatus === 'connected';
 
+  // List-generation token: install/update poll snapshots must win over list
+  // requests that were started before the mutation, so a late list response
+  // cannot revert the UI to the pre-install state.
+  const storeListGenRef = useRef(0);
+
   const loadStore = useCallback(async () => {
     if (!connected) {
       setLoading(false);
@@ -497,12 +502,16 @@ export function PluginStorePage() {
       return;
     }
 
+    const gen = ++storeListGenRef.current;
     setLoading(true);
     setError(null);
     try {
       const store = await pluginStoreApi.list();
+      if (storeListGenRef.current !== gen) return; // superseded by a poll snapshot
       setData(store);
+      setError(null);
     } catch (err: unknown) {
+      if (storeListGenRef.current !== gen) return; // superseded
       const status = getErrorStatus(err);
       if (status === 404) {
         setError({ kind: 'unsupported', message: t('plugin_store.unsupported_backend') });
@@ -521,7 +530,9 @@ export function PluginStorePage() {
         });
       }
     } finally {
-      setLoading(false);
+      if (storeListGenRef.current === gen) {
+        setLoading(false);
+      }
     }
   }, [connected, t]);
 
@@ -675,6 +686,8 @@ export function PluginStorePage() {
             (!version || pluginVersionMatches(plugin.installedVersion, version))
         );
         setData(installedState.response);
+        // Poll snapshot wins over any in-flight list request.
+        storeListGenRef.current++;
         if (
           installedState.timedOut ||
           !installedState.plugin?.installed ||
@@ -712,6 +725,8 @@ export function PluginStorePage() {
             (plugin) => plugin.registered && plugin.effectiveEnabled
           );
           setData(registeredState.response);
+          // Poll snapshot wins over any in-flight list request.
+          storeListGenRef.current++;
           if (
             registeredState.timedOut ||
             !registeredState.plugin?.registered ||

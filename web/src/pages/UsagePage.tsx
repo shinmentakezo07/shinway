@@ -107,7 +107,9 @@ function maskKey(key: string): string {
 }
 
 function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 // easeOutCubic for a snappy deceleration on count-ups.
@@ -429,13 +431,7 @@ function StatCard({ label, value, hint, tone = 'default', icon: Icon }: StatCard
 }
 
 /** Animated numeric stat value that counts up towards its target. */
-function AnimatedNumber({
-  value,
-  format,
-}: {
-  value: number;
-  format: (n: number) => string;
-}) {
+function AnimatedNumber({ value, format }: { value: number; format: (n: number) => string }) {
   const display = useCountUp(value, format);
   return <>{display}</>;
 }
@@ -476,7 +472,12 @@ function TokenNumbers({
   const items = [
     { key: 'input', label: t('usage.legend_input'), value: input, cls: styles.tnInput },
     { key: 'output', label: t('usage.legend_output'), value: output, cls: styles.tnOutput },
-    { key: 'reasoning', label: t('usage.legend_reasoning'), value: reasoning, cls: styles.tnReasoning },
+    {
+      key: 'reasoning',
+      label: t('usage.legend_reasoning'),
+      value: reasoning,
+      cls: styles.tnReasoning,
+    },
     { key: 'cached', label: t('usage.legend_cached'), value: cached, cls: styles.tnCached },
   ];
   const sum = items.reduce((s, it) => s + Math.max(0, it.value), 0);
@@ -524,9 +525,7 @@ function CostCell({ record }: { record: UsageRecord }) {
     return <span className={styles.costFree}>{t('usage.cost_free')}</span>;
   }
   const label = `${estimate.estimated ? '~' : ''}${formatUsd(estimate.cost)}`;
-  const title = estimate.estimated
-    ? t('usage.cost_estimated_hint')
-    : t('usage.cost_hint');
+  const title = estimate.estimated ? t('usage.cost_estimated_hint') : t('usage.cost_hint');
   return (
     <span
       className={`${styles.costValue} ${estimate.estimated ? styles.costEstimated : ''}`}
@@ -757,6 +756,10 @@ export function UsagePage() {
   const [stats, setStats] = useState<UsageStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Attempt token: only the newest loadStats/loadRecords call may commit state.
+  // This makes out-of-order responses (fast typing, flaky upstream) unrepresentable.
+  const statsAttemptRef = useRef(0);
+  const statsLatestRef = useRef(0);
 
   const [records, setRecords] = useState<UsageRecord[]>([]);
   const [recordsTotal, setRecordsTotal] = useState(0);
@@ -768,25 +771,37 @@ export function UsagePage() {
   const [activeDimension, setActiveDimension] = useState<'model' | 'provider' | 'api_key' | 'auth'>(
     'model'
   );
+  const recordsAttemptRef = useRef(0);
+  const recordsLatestRef = useRef(0);
 
   const disabled = connectionStatus !== 'connected';
 
   const loadStats = useCallback(async () => {
+    const attempt = ++statsLatestRef.current;
+    statsAttemptRef.current = attempt;
     setLoading(true);
     setError('');
     try {
       const data = await usageApi.getStats(range);
+      if (statsAttemptRef.current !== attempt) return; // superseded
       setStats(data);
+      setError('');
     } catch (err) {
+      if (statsAttemptRef.current !== attempt) return; // superseded
       setError(err instanceof Error ? err.message : t('notification.refresh_failed'));
-      setStats(null);
+      // Keep the previous stats visible so a transient failure does not blank
+      // the dashboard; the error box above explains the data may be stale.
     } finally {
-      setLoading(false);
+      if (statsAttemptRef.current === attempt) {
+        setLoading(false);
+      }
     }
   }, [range, t]);
 
   const loadRecords = useCallback(
     async (offset: number) => {
+      const attempt = ++recordsLatestRef.current;
+      recordsAttemptRef.current = attempt;
       setRecordsLoading(true);
       setRecordsError('');
       try {
@@ -797,15 +812,18 @@ export function UsagePage() {
           limit: PAGE_SIZE,
           offset,
         });
+        if (recordsAttemptRef.current !== attempt) return; // superseded
         setRecords(response.records || []);
         setRecordsTotal(response.total || 0);
         setRecordsOffset(offset);
+        setRecordsError('');
       } catch (err) {
+        if (recordsAttemptRef.current !== attempt) return; // superseded
         setRecordsError(err instanceof Error ? err.message : t('notification.refresh_failed'));
-        setRecords([]);
-        setRecordsTotal(0);
       } finally {
-        setRecordsLoading(false);
+        if (recordsAttemptRef.current === attempt) {
+          setRecordsLoading(false);
+        }
       }
     },
     [range, recordSearch, recordFailedOnly, t]
@@ -815,8 +833,14 @@ export function UsagePage() {
     loadStats();
   }, [loadStats]);
 
+  // Debounce record reloads so typing in the search box does not fire one
+  // request per keystroke. The attempt token in loadRecords still guards
+  // against out-of-order commits for whatever does get sent.
   useEffect(() => {
-    loadRecords(0);
+    const timer = window.setTimeout(() => {
+      loadRecords(0);
+    }, 250);
+    return () => window.clearTimeout(timer);
   }, [loadRecords]);
 
   useHeaderRefresh(
@@ -948,7 +972,9 @@ export function UsagePage() {
             />
             <StatCard
               label={t('usage.stat_cached')}
-              value={<AnimatedNumber value={stats.summary.total_cached_tokens} format={formatNumber} />}
+              value={
+                <AnimatedNumber value={stats.summary.total_cached_tokens} format={formatNumber} />
+              }
               hint={t('usage.stat_cached_hint')}
               icon={IconCheckCircle2}
               tone="success"
@@ -956,7 +982,10 @@ export function UsagePage() {
             <StatCard
               label={t('usage.stat_reasoning')}
               value={
-                <AnimatedNumber value={stats.summary.total_reasoning_tokens} format={formatNumber} />
+                <AnimatedNumber
+                  value={stats.summary.total_reasoning_tokens}
+                  format={formatNumber}
+                />
               }
               icon={IconBot}
             />
@@ -1221,7 +1250,9 @@ export function UsagePage() {
                               className={styles.tokensCell}
                               title={`in ${r.InputTokens} · out ${r.OutputTokens} · reasoning ${r.ReasoningTokens} · cached ${r.CachedTokens}`}
                             >
-                              <span className={styles.tokensValue}>{formatNumber(r.TotalTokens)}</span>
+                              <span className={styles.tokensValue}>
+                                {formatNumber(r.TotalTokens)}
+                              </span>
                               {showLogTokenPie && (
                                 <TokenNumbers
                                   input={r.InputTokens}

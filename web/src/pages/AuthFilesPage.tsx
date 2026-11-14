@@ -397,7 +397,9 @@ export function AuthFilesPage() {
 
   useInterval(
     () => {
-      void loadFiles().catch(() => {});
+      // Silent poll: refresh data in place without toggling the page-level
+      // loading flag, so the grid never blanks while the user is working.
+      void loadFiles({ silent: true }).catch(() => {});
     },
     isCurrentLayer ? 240_000 : null
   );

@@ -29,6 +29,9 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
   const [modelsFileType, setModelsFileType] = useState('');
   const [modelsError, setModelsError] = useState<ModelsError>(null);
   const modelsCacheRef = useRef<Map<string, AuthFileModelItem[]>>(new Map());
+  // Identity guard: only the most recently requested credential may commit
+  // model data, so a slow response for A cannot render under B's title.
+  const modelsRequestNameRef = useRef('');
 
   const closeModelsModal = useCallback(() => {
     setModelsModalOpen(false);
@@ -36,6 +39,7 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
 
   const showModels = useCallback(
     async (item: AuthFileItem) => {
+      modelsRequestNameRef.current = item.name;
       setModelsFileName(item.name);
       setModelsFileType(item.type || '');
       setModelsList([]);
@@ -52,9 +56,11 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
       setModelsLoading(true);
       try {
         const models = await authFilesApi.getModelsForAuthFile(item.name);
+        if (modelsRequestNameRef.current !== item.name) return; // superseded
         modelsCacheRef.current.set(item.name, models);
         setModelsList(models);
       } catch (err) {
+        if (modelsRequestNameRef.current !== item.name) return; // superseded
         const errorMessage = err instanceof Error ? err.message : '';
         if (
           errorMessage.includes('404') ||
@@ -66,7 +72,9 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
           showNotification(`${t('notification.load_failed')}: ${errorMessage}`, 'error');
         }
       } finally {
-        setModelsLoading(false);
+        if (modelsRequestNameRef.current === item.name) {
+          setModelsLoading(false);
+        }
       }
     },
     [showNotification, t]

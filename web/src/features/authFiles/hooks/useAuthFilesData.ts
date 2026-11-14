@@ -40,7 +40,7 @@ export type UseAuthFilesDataResult = {
   manualRefreshing: Record<string, boolean>;
   batchStatusUpdating: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
-  loadFiles: () => Promise<void>;
+  loadFiles: (options?: { silent?: boolean }) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleDelete: (name: string) => void;
@@ -161,19 +161,36 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     });
   }, [files, selectedFiles.size]);
 
-  const loadFiles = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await authFilesApi.list();
-      setFiles(data?.files || []);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  // Generation token for file-list loads. Background polling and explicit
+  // refreshes bump the generation; only the newest load may commit state, so
+  // a slow poll can neither blank the grid mid-mutation nor overwrite a fresh
+  // upload/delete result.
+  const filesLoadGenRef = useRef(0);
+
+  const loadFiles = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const gen = ++filesLoadGenRef.current;
+      if (!options?.silent) {
+        setLoading(true);
+      }
+      setError('');
+      try {
+        const data = await authFilesApi.list();
+        if (filesLoadGenRef.current !== gen) return; // superseded
+        setFiles(data?.files || []);
+        setError('');
+      } catch (err: unknown) {
+        if (filesLoadGenRef.current !== gen) return; // superseded
+        const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
+        setError(errorMessage);
+      } finally {
+        if (filesLoadGenRef.current === gen && !options?.silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [t]
+  );
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();

@@ -5,14 +5,28 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // PostgresWriter mirrors usage records into a PostgreSQL table.
 // It is intended as a durable secondary copy alongside the local SQLite store.
 type PostgresWriter struct {
-	db     *sql.DB
-	table  string
-	schema string
+	db         *sql.DB
+	table      string
+	schema     string
+	firstFail  sync.Once
+	firstFailV bool
+}
+
+// TakeFirstFailure reports whether this is the first write failure observed.
+// It is used by the store to escalate the first error to a visible log level.
+func (w *PostgresWriter) TakeFirstFailure() bool {
+	if w == nil {
+		return false
+	}
+	w.firstFail.Do(func() { w.firstFailV = true })
+	defer func() { w.firstFailV = false }()
+	return w.firstFailV
 }
 
 // NewPostgresWriter creates a writer that persists records to the given

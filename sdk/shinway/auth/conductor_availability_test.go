@@ -63,6 +63,112 @@ func TestUpdateAggregatedAvailability_FutureNextRetryBlocksAuth(t *testing.T) {
 	}
 }
 
+func TestUpdateAggregatedAvailability_ExpiredCooldownRestoresStatus(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	model := "test-model"
+	auth := &Auth{
+		ID:     "a",
+		Status: StatusError,
+		ModelStates: map[string]*ModelState{
+			model: {
+				Status:         StatusError,
+				StatusMessage:  "quota exceeded",
+				Unavailable:    true,
+				NextRetryAfter: now.Add(-time.Minute),
+				LastError:      &Error{Code: "quota", Message: "quota exceeded"},
+			},
+		},
+	}
+
+	updateAggregatedAvailability(auth, now)
+
+	if auth.Unavailable {
+		t.Fatalf("auth.Unavailable = true, want false after cooldown expiry")
+	}
+	if auth.Status != StatusActive {
+		t.Fatalf("auth.Status = %q, want %q after cooldown expiry", auth.Status, StatusActive)
+	}
+	if auth.StatusMessage != "" {
+		t.Fatalf("auth.StatusMessage = %q, want empty after cooldown expiry", auth.StatusMessage)
+	}
+	state := auth.ModelStates[model]
+	if state.Status != StatusActive || state.Unavailable {
+		t.Fatalf("model state = status %q unavailable %v, want active/available after expiry", state.Status, state.Unavailable)
+	}
+}
+
+func TestUpdateAggregatedAvailability_PartialRecoveryClearsAuthStatusWhenAnyModelReady(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	blocked, recovered := "blocked", "recovered"
+	auth := &Auth{
+		ID:     "a",
+		Status: StatusError,
+		ModelStates: map[string]*ModelState{
+			blocked: {
+				Status:         StatusError,
+				Unavailable:    true,
+				NextRetryAfter: now.Add(5 * time.Minute),
+			},
+			recovered: {
+				Status:         StatusError,
+				Unavailable:    true,
+				NextRetryAfter: now.Add(-time.Minute),
+			},
+		},
+	}
+
+	updateAggregatedAvailability(auth, now)
+
+	// Baseline semantics: the aggregated Unavailable flag is only true when
+	// every model state is blocked, so one expired cooldown already clears it.
+	if auth.Unavailable {
+		t.Fatalf("auth.Unavailable = true, want false once any model recovered")
+	}
+	if auth.Status != StatusActive {
+		t.Fatalf("auth.Status = %q, want %q once any model recovered", auth.Status, StatusActive)
+	}
+	if auth.ModelStates[recovered].Status != StatusActive {
+		t.Fatalf("recovered model status = %q, want active", auth.ModelStates[recovered].Status)
+	}
+	// The still-cooling model keeps its own error state.
+	if auth.ModelStates[blocked].Status != StatusError || !auth.ModelStates[blocked].Unavailable {
+		t.Fatalf("blocked model state = status %q unavailable %v, want error/unavailable",
+			auth.ModelStates[blocked].Status, auth.ModelStates[blocked].Unavailable)
+	}
+}
+
+func TestClearCooldownStateForAuth_RestoresStatus(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	model := "test-model"
+	auth := &Auth{
+		ID:     "a",
+		Status: StatusError,
+		ModelStates: map[string]*ModelState{
+			model: {
+				Status:         StatusError,
+				Unavailable:    true,
+				NextRetryAfter: now.Add(5 * time.Minute),
+			},
+		},
+	}
+
+	if !clearCooldownStateForAuth(auth, now) {
+		t.Fatalf("clearCooldownStateForAuth() = false, want true")
+	}
+	if auth.Status != StatusActive {
+		t.Fatalf("auth.Status = %q, want %q after explicit cooldown clear", auth.Status, StatusActive)
+	}
+	if state := auth.ModelStates[model]; state.Status != StatusActive || state.Unavailable {
+		t.Fatalf("model state = status %q unavailable %v, want active/available after clear", state.Status, state.Unavailable)
+	}
+}
+
 func TestManager_AvailableProvidersAndHasProviderAuth_ExcludeDisabled(t *testing.T) {
 	manager := NewManager(nil, nil, nil)
 	ctx := context.Background()

@@ -13,6 +13,7 @@ import (
 	"github.com/shinmentakezo07/shinway/v7/internal/logging"
 	"github.com/shinmentakezo07/shinway/v7/internal/managementasset"
 	"github.com/shinmentakezo07/shinway/v7/internal/redisqueue"
+	"github.com/shinmentakezo07/shinway/v7/internal/store"
 	"github.com/shinmentakezo07/shinway/v7/internal/usagestore"
 	"github.com/shinmentakezo07/shinway/v7/internal/util"
 	sdkAuth "github.com/shinmentakezo07/shinway/v7/sdk/auth"
@@ -94,12 +95,21 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	// Reopen the persistent usage store if the auth directory changed so the
 	// default options are reapplied. The store itself is kept in the repo db/
 	// directory, but config reloads may switch mirror writers.
+	//
+	// Also ensure the PostgreSQL usage mirror is attached whenever a Postgres
+	// token store is active, so enabling the database after startup still
+	// mirrors usage records instead of silently dropping them.
 	if oldCfg == nil || oldCfg.AuthDir != cfg.AuthDir {
 		wd, errWd := os.Getwd()
 		if errWd != nil {
 			log.WithError(errWd).Warn("failed to get working directory for usage store")
 		} else if _, errOpen := usagestore.Open(filepath.Join(wd, "db")); errOpen != nil {
 			log.WithError(errOpen).Warn("failed to reopen usage store on config reload")
+		}
+	}
+	if store, ok := sdkAuth.GetTokenStore().(*store.PostgresStore); ok && store != nil && store.DB() != nil {
+		if errAttach := usagestore.AttachPostgresMirror(store.DB(), ""); errAttach != nil {
+			log.WithError(errAttach).Warn("failed to attach PostgreSQL usage mirror on config reload")
 		}
 	}
 

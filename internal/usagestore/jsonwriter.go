@@ -13,10 +13,23 @@ import (
 // to a local file. It is safe for concurrent use and survives process restarts
 // as long as the file is stored on a persistent volume.
 type JSONWriter struct {
-	path string
-	file *os.File
-	enc  *json.Encoder
-	mu   sync.Mutex
+	path       string
+	file       *os.File
+	enc        *json.Encoder
+	mu         sync.Mutex
+	firstFail  sync.Once
+	firstFailV bool
+}
+
+// TakeFirstFailure reports whether this is the first write failure observed.
+// It is used by the store to escalate the first error to a visible log level.
+func (w *JSONWriter) TakeFirstFailure() bool {
+	if w == nil {
+		return false
+	}
+	w.firstFail.Do(func() { w.firstFailV = true })
+	defer func() { w.firstFailV = false }()
+	return w.firstFailV
 }
 
 // NewJSONWriter opens (or creates) the JSON Lines file at path.

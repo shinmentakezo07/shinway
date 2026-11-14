@@ -763,6 +763,13 @@ export function MainLayout() {
       );
       return;
     }
+    // triggerHeaderRefresh resolves to false when the current page has no
+    // refresh handler; that used to be reported as success. Surface it.
+    const pageRefreshed = results[3].status === 'fulfilled' ? (results[3].value as boolean) : false;
+    if (!pageRefreshed) {
+      showNotification(t('notification.refresh_failed'), 'error');
+      return;
+    }
     showNotification(t('notification.data_refreshed'), 'success');
   };
 

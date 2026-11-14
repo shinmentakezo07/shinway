@@ -33,6 +33,8 @@ interface ProviderState {
   callbackSubmitting?: boolean;
   callbackStatus?: 'success' | 'error';
   callbackError?: string;
+  /** Set once the manual callback succeeds; the status poll must not override it. */
+  callbackConsumed?: boolean;
 }
 
 interface VertexImportResult {
@@ -378,6 +380,13 @@ export function OAuthPage() {
     clearPollingTimer(provider);
     const timer = window.setInterval(async () => {
       try {
+        // A manually submitted callback that already completed the flow must
+        // not be contradicted by a late poll result for the same state.
+        if (states[provider]?.callbackConsumed) {
+          window.clearInterval(timer);
+          delete pollingTimers.current[provider];
+          return;
+        }
         const res = await oauthApi.getAuthStatus(state);
         if (res.status === 'ok') {
           completeProviderAuth(provider);
@@ -414,6 +423,7 @@ export function OAuthPage() {
       error: undefined,
       callbackStatus: undefined,
       callbackError: undefined,
+      callbackConsumed: false,
       callbackUrl: '',
     });
     try {
@@ -486,7 +496,11 @@ export function OAuthPage() {
     });
     try {
       await oauthApi.submitCallback(provider, redirectUrl);
-      updateProviderState(provider, { callbackSubmitting: false, callbackStatus: 'success' });
+      updateProviderState(provider, {
+        callbackSubmitting: false,
+        callbackStatus: 'success',
+        callbackConsumed: true,
+      });
       showNotification(t('auth_login.oauth_callback_success'), 'success');
     } catch (err: unknown) {
       const status = getErrorStatus(err);

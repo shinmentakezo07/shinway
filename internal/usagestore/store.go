@@ -81,6 +81,37 @@ func (s *Store) AttachWriter(w Writer) {
 	s.writers = append(s.writers, w)
 }
 
+// AttachPostgresMirror attaches a PostgreSQL mirror writer to the default
+// store, creating it if needed. It is idempotent per (db, schema) pair so
+// config reloads can call it repeatedly without stacking duplicate writers.
+// The store does not have to exist yet; in that case this is a no-op and the
+// mirror is attached later via SetDefaultOptions when Open runs.
+func AttachPostgresMirror(db *sql.DB, schema string) error {
+	if db == nil {
+		return errors.New("usagestore: nil postgres db")
+	}
+	defaultStoreMu.Lock()
+	store := defaultStore
+	defaultStoreMu.Unlock()
+	if store == nil {
+		return nil
+	}
+	w, err := NewPostgresWriter(db, schema)
+	if err != nil {
+		return err
+	}
+	store.mu.Lock()
+	for _, writer := range store.writers {
+		if pw, ok := writer.(*PostgresWriter); ok && pw.table == w.table && pw.db == w.db {
+			store.mu.Unlock()
+			return nil
+		}
+	}
+	store.mu.Unlock()
+	store.AttachWriter(w)
+	return nil
+}
+
 // Open initializes (or reuses) the default store rooted at dir. The returned
 // store must be closed by the caller; however the package keeps a reference so
 // the usage plugin can reach it from any goroutine.
@@ -335,7 +366,14 @@ func (s *Store) Insert(ctx context.Context, r Record) error {
 
 	for _, w := range s.writers {
 		if wErr := w.Write(ctx, r); wErr != nil {
-			log.WithError(wErr).Debug("usagestore: mirror writer failed")
+			// Escalate the first failure of each writer to Warn so a broken
+			// mirror setup (bad DSN, full disk, schema mismatch) is visible;
+			// afterwards log at Debug to avoid per-request log spam.
+			if fw, ok := w.(interface{ TakeFirstFailure() bool }); ok && fw.TakeFirstFailure() {
+				log.WithError(wErr).Warn("usagestore: mirror writer failed; further failures logged at debug")
+			} else {
+				log.WithError(wErr).Debug("usagestore: mirror writer failed")
+			}
 		}
 	}
 	return nil

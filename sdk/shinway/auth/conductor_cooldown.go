@@ -387,8 +387,17 @@ func clearCooldownStateForAuth(auth *Auth, now time.Time) bool {
 			state.NextRetryAfter = time.Time{}
 			state.Quota = QuotaState{}
 			state.UpdatedAt = now
+			if state.Status == StatusError {
+				state.Status = StatusActive
+				state.StatusMessage = ""
+				state.LastError = nil
+			}
 			changed = true
 		}
+	}
+	if changed && !auth.Disabled && auth.Status == StatusError {
+		auth.Status = StatusActive
+		auth.StatusMessage = ""
 	}
 	if len(auth.ModelStates) > 0 {
 		updateAggregatedAvailability(auth, now)
@@ -1002,6 +1011,15 @@ func updateAggregatedAvailability(auth *Auth, now time.Time) {
 			} else {
 				state.Unavailable = false
 				state.NextRetryAfter = time.Time{}
+				// The cooldown expired: the model is selectable again. Clear
+				// the error markers so the aggregated auth-level status can
+				// recover too. Quota state is kept because it recovers on its
+				// own NextRecoverAt schedule.
+				if state.Status == StatusError {
+					state.Status = StatusActive
+					state.StatusMessage = ""
+					state.LastError = nil
+				}
 			}
 		}
 		if !stateUnavailable {
@@ -1038,6 +1056,13 @@ func updateAggregatedAvailability(auth *Auth, now time.Time) {
 		auth.Quota.NextRecoverAt = time.Time{}
 		auth.Quota.BackoffLevel = 0
 	}
+	// When at least one model is selectable again, the credential is no longer
+	// globally erroring. Keep StatusError only while every model is blocked;
+	// otherwise management output would report a healthy credential as error.
+	if !allUnavailable && auth.Status == StatusError {
+		auth.Status = StatusActive
+		auth.StatusMessage = ""
+	}
 }
 
 func clearAggregatedAvailability(auth *Auth) {
@@ -1047,6 +1072,10 @@ func clearAggregatedAvailability(auth *Auth) {
 	auth.Unavailable = false
 	auth.NextRetryAfter = time.Time{}
 	auth.Quota = QuotaState{}
+	if auth.Status == StatusError {
+		auth.Status = StatusActive
+		auth.StatusMessage = ""
+	}
 }
 
 func hasModelError(auth *Auth, now time.Time) bool {
