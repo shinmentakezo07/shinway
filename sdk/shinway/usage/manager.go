@@ -45,10 +45,14 @@ type Record struct {
 	Generate    *bool
 	RequestedAt time.Time
 	Latency     time.Duration
-	TTFT        time.Duration
-	Failed      bool
-	Fail        Failure
-	Detail      Detail
+	// UpstreamLatency measures upstream execution through body EOF, or publication
+	// while the response is active. Zero means no upstream timing was observed.
+	// It includes upstream waiting and transfer, not just token decoding.
+	UpstreamLatency time.Duration
+	TTFT            time.Duration
+	Failed          bool
+	Fail            Failure
+	Detail          Detail
 	// ResponseHeaders stores a snapshot of upstream response headers for usage sinks.
 	ResponseHeaders http.Header
 }

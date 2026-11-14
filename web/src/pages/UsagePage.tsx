@@ -52,6 +52,7 @@ import styles from './UsagePage.module.scss';
 
 const RANGES: UsageRange[] = ['1h', '6h', '24h', '7d', '30d', 'all'];
 const PAGE_SIZE = 50;
+const LIVE_TAIL_INTERVAL_MS = 3000;
 const BAR_COLORS = ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'];
 
 function formatNumber(n: number): string {
@@ -66,6 +67,10 @@ function formatMs(ms: number): string {
   if (!ms) return '0ms';
   if (ms < 1000) return `${Math.round(ms)}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatTPS(tps: number | null | undefined): string {
+  return tps != null && Number.isFinite(tps) && tps >= 0 ? `${tps.toFixed(2)} tok/s` : '—';
 }
 
 function formatTs(iso: string): string {
@@ -751,6 +756,8 @@ export function UsagePage() {
   const showLogTokenPie = useUsagePrefsStore((state) => state.showLogTokenPie);
   const setShowLogCost = useUsagePrefsStore((state) => state.setShowLogCost);
   const setShowLogTokenPie = useUsagePrefsStore((state) => state.setShowLogTokenPie);
+  const liveTail = useUsagePrefsStore((state) => state.liveTail);
+  const setLiveTail = useUsagePrefsStore((state) => state.setLiveTail);
 
   const [range, setRange] = useState<UsageRange>('24h');
   const [stats, setStats] = useState<UsageStatsResponse | null>(null);
@@ -773,6 +780,7 @@ export function UsagePage() {
   );
   const recordsAttemptRef = useRef(0);
   const recordsLatestRef = useRef(0);
+  const recordsInFlightRef = useRef(0);
 
   const disabled = connectionStatus !== 'connected';
 
@@ -799,11 +807,15 @@ export function UsagePage() {
   }, [range, t]);
 
   const loadRecords = useCallback(
-    async (offset: number) => {
+    async (offset: number, background = false) => {
+      if (disabled || (background && recordsInFlightRef.current > 0)) return;
       const attempt = ++recordsLatestRef.current;
       recordsAttemptRef.current = attempt;
-      setRecordsLoading(true);
-      setRecordsError('');
+      recordsInFlightRef.current++;
+      if (!background) {
+        setRecordsLoading(true);
+        setRecordsError('');
+      }
       try {
         const response = await usageApi.getRecords({
           range,
@@ -821,12 +833,13 @@ export function UsagePage() {
         if (recordsAttemptRef.current !== attempt) return; // superseded
         setRecordsError(err instanceof Error ? err.message : t('notification.refresh_failed'));
       } finally {
+        recordsInFlightRef.current--;
         if (recordsAttemptRef.current === attempt) {
           setRecordsLoading(false);
         }
       }
     },
-    [range, recordSearch, recordFailedOnly, t]
+    [disabled, range, recordSearch, recordFailedOnly, t]
   );
 
   useEffect(() => {
@@ -840,8 +853,28 @@ export function UsagePage() {
     const timer = window.setTimeout(() => {
       loadRecords(0);
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      recordsAttemptRef.current = ++recordsLatestRef.current;
+    };
   }, [loadRecords]);
+
+  useEffect(() => {
+    if (!liveTail || disabled || recordsOffset !== 0) return;
+    let stopped = false;
+    let timer: number;
+    const poll = async () => {
+      if (document.visibilityState === 'visible') {
+        await loadRecords(0, true);
+      }
+      if (!stopped) timer = window.setTimeout(poll, LIVE_TAIL_INTERVAL_MS);
+    };
+    timer = window.setTimeout(poll, LIVE_TAIL_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [liveTail, disabled, recordsOffset, loadRecords]);
 
   useHeaderRefresh(
     useCallback(() => {
@@ -923,7 +956,7 @@ export function UsagePage() {
 
       {loading && !stats ? (
         <div className={styles.skeletonGrid}>
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: 9 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard} />
           ))}
           <div className={`${styles.skeletonCard} ${styles.skeletonChart}`} />
@@ -997,6 +1030,13 @@ export function UsagePage() {
               }
               icon={IconTimer}
               tone="amber"
+            />
+            <StatCard
+              label={t('usage.stat_avg_tps')}
+              value={formatTPS(stats.summary.avg_tps)}
+              hint={t('usage.tps_avg_hint')}
+              icon={IconActivity}
+              tone="accent"
             />
             <StatCard
               label={t('usage.stat_models')}
@@ -1167,6 +1207,18 @@ export function UsagePage() {
             className={styles.glassCard}
             extra={
               <div className={styles.recordsControls}>
+                <span title={t('usage.live_tail_hint')}>
+                  <ToggleSwitch
+                    checked={liveTail}
+                    onChange={setLiveTail}
+                    disabled={disabled}
+                    label={t('usage.live_tail')}
+                    ariaLabel={t('usage.live_tail')}
+                  />
+                </span>
+                {liveTail && recordsOffset > 0 && (
+                  <span className={styles.windowNote}>{t('usage.live_tail_paused')}</span>
+                )}
                 <div className={styles.searchWrap}>
                   <Input
                     placeholder={t('usage.search_placeholder')}
@@ -1220,6 +1272,7 @@ export function UsagePage() {
                         <th>{t('usage.col_tokens')}</th>
                         {showLogCost && <th>{t('usage.col_cost')}</th>}
                         <th>{t('usage.col_latency')}</th>
+                        <th title={t('usage.tps_hint')}>{t('usage.col_tps')}</th>
                         <th>{t('usage.col_status')}</th>
                       </tr>
                     </thead>
@@ -1274,6 +1327,12 @@ export function UsagePage() {
                             >
                               {formatMs(r.LatencyMs)}
                             </span>
+                          </td>
+                          <td title={t('usage.tps_hint')}>
+                            <span className={styles.tpsPill}>{formatTPS(r.TPS)}</span>
+                            {r.TPS != null && r.TPSBasis === 'end-to-end' && (
+                              <small title={t('usage.tps_estimate_hint')}> ≈</small>
+                            )}
                           </td>
                           <td>
                             {r.Failed ? (

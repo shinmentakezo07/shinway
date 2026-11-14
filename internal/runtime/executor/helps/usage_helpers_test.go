@@ -2,6 +2,7 @@ package helps
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -611,6 +612,184 @@ func TestUsageReporterBuildAdditionalModelRecordSkipsZeroTokens(t *testing.T) {
 	}
 	if _, ok := reporter.buildAdditionalModelRecord("gpt-image-2", usage.Detail{CachedTokens: 2}); !ok {
 		t.Fatalf("expected non-zero cached token usage to be recorded")
+	}
+}
+
+func TestUsageReporterUpstreamTimingExcludesPreparationAndPostprocessing(t *testing.T) {
+	now := time.Now()
+	reporter := NewUsageReporter(context.Background(), "openai", "gpt-5.4", nil)
+	reporter.requestedAt = now.Add(-time.Hour)
+	reporter.clock = func() time.Time { return now }
+	transport := usageTTFTRoundTripper{
+		reporter: reporter,
+		base: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			now = now.Add(125 * time.Microsecond)
+			return &http.Response{Body: io.NopCloser(strings.NewReader("ok"))}, nil
+		}),
+	}
+	resp, err := transport.RoundTrip(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(250 * time.Microsecond)
+	if _, err := io.ReadAll(resp.Body); err != nil {
+		t.Fatal(err)
+	}
+	want := 375 * time.Microsecond
+	if got := reporter.ttftDuration(); got != want {
+		t.Fatalf("TTFT = %v, want %v", got, want)
+	}
+	now = now.Add(time.Hour)
+	record := reporter.buildRecord(usage.Detail{OutputTokens: 2}, false)
+	if record.UpstreamLatency != want {
+		t.Fatalf("upstream latency = %v, want %v", record.UpstreamLatency, want)
+	}
+	if record.Latency < time.Hour {
+		t.Fatalf("end-to-end latency = %v, want preparation included", record.Latency)
+	}
+	if _, err := resp.Body.Read(make([]byte, 1)); err != io.EOF {
+		t.Fatalf("repeated EOF error = %v", err)
+	}
+	if got := reporter.upstreamLatency(); got != want {
+		t.Fatalf("repeated EOF changed upstream latency to %v", got)
+	}
+}
+
+func TestUsageReporterActiveUpstreamTimingUsesPublicationTime(t *testing.T) {
+	now := time.Now()
+	reporter := NewUsageReporter(context.Background(), "openai", "gpt-5.4", nil)
+	reporter.clock = func() time.Time { return now }
+	reporter.StartResponseTTFT()
+	now = now.Add(700 * time.Microsecond)
+	record := reporter.buildRecord(usage.Detail{OutputTokens: 1}, false)
+	if record.UpstreamLatency != 700*time.Microsecond {
+		t.Fatalf("upstream latency = %v, want 700µs", record.UpstreamLatency)
+	}
+	now = now.Add(300 * time.Microsecond)
+	if got := reporter.upstreamLatency(); got != time.Millisecond {
+		t.Fatalf("active upstream latency = %v, want 1ms", got)
+	}
+}
+
+func TestUsageReporterRepeatedResponseNotificationsDoNotResetTiming(t *testing.T) {
+	now := time.Now()
+	reporter := NewUsageReporter(context.Background(), "openai", "gpt-5.4", nil)
+	reporter.clock = func() time.Time { return now }
+	reporter.StartResponseTTFT()
+	now = now.Add(100 * time.Microsecond)
+	reporter.StartResponseTTFT()
+	resp := &http.Response{Body: io.NopCloser(strings.NewReader("ok"))}
+	reporter.ObserveResponse(resp)
+	body := resp.Body
+	now = now.Add(200 * time.Microsecond)
+	reporter.ObserveResponse(resp)
+	if resp.Body != body {
+		t.Fatal("repeated ObserveResponse wrapped the body again")
+	}
+	if _, err := io.ReadAll(resp.Body); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(time.Second)
+	reporter.StartResponseTTFT()
+	reporter.ObserveResponse(resp)
+	if got := reporter.upstreamLatency(); got != 300*time.Microsecond {
+		t.Fatalf("upstream latency = %v, want 300µs", got)
+	}
+	if got := reporter.ttftDuration(); got != 300*time.Microsecond {
+		t.Fatalf("TTFT = %v, want 300µs", got)
+	}
+}
+
+func TestUsageReporterHTTPRetryRestartsTimingAfterTransportFailure(t *testing.T) {
+	now := time.Now()
+	reporter := NewUsageReporter(context.Background(), "openai", "gpt-5.4", nil)
+	reporter.clock = func() time.Time { return now }
+	failure := errors.New("transport failed")
+	failed := true
+	transport := usageTTFTRoundTripper{
+		reporter: reporter,
+		base: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			if failed {
+				now = now.Add(time.Second)
+				return nil, failure
+			}
+			now = now.Add(200 * time.Microsecond)
+			return &http.Response{Body: io.NopCloser(strings.NewReader("ok"))}, nil
+		}),
+	}
+	if _, err := transport.RoundTrip(nil); !errors.Is(err, failure) {
+		t.Fatalf("RoundTrip error = %v, want transport failure", err)
+	}
+	now = now.Add(time.Minute)
+	if got := reporter.upstreamLatency(); got != time.Second {
+		t.Fatalf("failed attempt latency = %v, want 1s", got)
+	}
+	failed = false
+	resp, err := transport.RoundTrip(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.ReadAll(resp.Body); err != nil {
+		t.Fatal(err)
+	}
+	if got := reporter.upstreamLatency(); got != 200*time.Microsecond {
+		t.Fatalf("retry upstream latency = %v, want 200µs", got)
+	}
+	if got := reporter.ttftDuration(); got != 200*time.Microsecond {
+		t.Fatalf("retry TTFT = %v, want 200µs", got)
+	}
+}
+
+func TestUsageReporterHTTPRetryIgnoresPreviousResponseBody(t *testing.T) {
+	now := time.Now()
+	reporter := NewUsageReporter(context.Background(), "openai", "gpt-5.4", nil)
+	reporter.clock = func() time.Time { return now }
+	transport := usageTTFTRoundTripper{
+		reporter: reporter,
+		base: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{Body: io.NopCloser(strings.NewReader("ok"))}, nil
+		}),
+	}
+	previous, err := transport.RoundTrip(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := previous.Body.Read(make([]byte, 2)); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(time.Second)
+	current, err := transport.RoundTrip(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(100 * time.Microsecond)
+	if _, err := io.ReadAll(previous.Body); err != nil {
+		t.Fatal(err)
+	}
+	if got := reporter.ttftDuration(); got != 0 {
+		t.Fatalf("previous attempt set retry TTFT to %v", got)
+	}
+	now = now.Add(200 * time.Microsecond)
+	if _, err := io.ReadAll(current.Body); err != nil {
+		t.Fatal(err)
+	}
+	if got := reporter.upstreamLatency(); got != 300*time.Microsecond {
+		t.Fatalf("retry upstream latency = %v, want 300µs", got)
+	}
+	if got := reporter.ttftDuration(); got != 300*time.Microsecond {
+		t.Fatalf("retry TTFT = %v, want 300µs", got)
+	}
+}
+
+func TestUsageReporterMissingUpstreamTimingRemainsUnavailable(t *testing.T) {
+	reporter := NewUsageReporter(context.Background(), "openai", "gpt-5.4", nil)
+	reporter.MarkFirstResponseByte()
+	if record := reporter.buildRecord(usage.Detail{OutputTokens: 1}, false); record.UpstreamLatency != 0 || record.TTFT != 0 {
+		t.Fatalf("unobserved timing = upstream %v, TTFT %v", record.UpstreamLatency, record.TTFT)
+	}
+	var missing *UsageReporter
+	if got := missing.upstreamLatency(); got != 0 {
+		t.Fatalf("nil reporter upstream latency = %v", got)
 	}
 }
 

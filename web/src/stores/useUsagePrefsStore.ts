@@ -12,6 +12,9 @@ interface UsagePrefsState {
   showLogCost: boolean;
   /** Show the input/output/reasoning token pie in the Request Log. */
   showLogTokenPie: boolean;
+  /** Automatically refresh the newest Request Log page. */
+  liveTail: boolean;
+  setLiveTail: (value: boolean) => void;
   setShowLogCost: (value: boolean) => void;
   setShowLogTokenPie: (value: boolean) => void;
 }
@@ -21,6 +24,8 @@ export const useUsagePrefsStore = create<UsagePrefsState>()(
     (set) => ({
       showLogCost: true,
       showLogTokenPie: true,
+      liveTail: true,
+      setLiveTail: (value) => set({ liveTail: value }),
       setShowLogCost: (value) => set({ showLogCost: value }),
       setShowLogTokenPie: (value) => set({ showLogTokenPie: value }),
     }),

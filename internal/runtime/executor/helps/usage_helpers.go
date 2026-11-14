@@ -22,24 +22,28 @@ import (
 )
 
 type UsageReporter struct {
-	provider     string
-	executorType string
-	model        string
-	alias        string
-	authID       string
-	authIndex    string
-	authType     string
-	apiKey       string
-	source       string
-	reasoning    string
-	serviceTier  string
-	generate     bool
-	requestedAt  time.Time
-	ttftMu       sync.RWMutex
-	ttft         time.Duration
-	ttftStart    time.Time
-	ttftSet      bool
-	once         sync.Once
+	provider        string
+	executorType    string
+	model           string
+	alias           string
+	authID          string
+	authIndex       string
+	authType        string
+	apiKey          string
+	source          string
+	reasoning       string
+	serviceTier     string
+	generate        bool
+	requestedAt     time.Time
+	ttftMu          sync.RWMutex
+	ttft            time.Duration
+	ttftStart       time.Time
+	ttftSet         bool
+	upstreamStart   time.Time
+	upstreamEnd     time.Time
+	upstreamAttempt uint64
+	clock           func() time.Time
+	once            sync.Once
 }
 
 type usageExecutor interface {
@@ -131,22 +135,43 @@ func (r *UsageReporter) ObserveResponse(resp *http.Response) {
 	if r == nil || resp == nil || resp.Body == nil {
 		return
 	}
+	if body, ok := resp.Body.(*usageTTFTReadCloser); ok && body.reporter == r {
+		return
+	}
 	r.StartResponseTTFT()
+	r.ttftMu.RLock()
+	attempt := r.upstreamAttempt
+	r.ttftMu.RUnlock()
+	r.observeResponseAttempt(resp, attempt)
+}
+
+func (r *UsageReporter) observeResponseAttempt(resp *http.Response, attempt uint64) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
 	resp.Body = &usageTTFTReadCloser{
 		ReadCloser: resp.Body,
-		mark: func() {
-			r.MarkFirstResponseByte()
-		},
+		reporter:   r,
+		attempt:    attempt,
 	}
 }
 
+// StartResponseTTFT starts response timing for websocket and relay execution.
+// Repeated metadata notifications must not restart an active measurement.
 func (r *UsageReporter) StartResponseTTFT() {
 	if r == nil {
 		return
 	}
 	r.ttftMu.Lock()
-	if !r.ttftSet && r.ttftStart.IsZero() {
-		r.ttftStart = time.Now()
+	if r.upstreamStart.IsZero() || (!r.ttftSet && r.ttftStart.IsZero()) {
+		now := r.now()
+		if r.upstreamStart.IsZero() {
+			r.upstreamAttempt++
+			r.upstreamStart = now
+		}
+		if !r.ttftSet && r.ttftStart.IsZero() {
+			r.ttftStart = now
+		}
 	}
 	r.ttftMu.Unlock()
 }
@@ -156,17 +181,20 @@ func (r *UsageReporter) MarkFirstResponseByte() {
 		return
 	}
 	r.ttftMu.Lock()
-	if r.ttftSet {
-		r.ttftMu.Unlock()
-		return
-	}
-	start := r.ttftStart
-	r.ttftStart = time.Time{}
+	r.markFirstResponseByteLocked()
 	r.ttftMu.Unlock()
-	if start.IsZero() {
+}
+
+func (r *UsageReporter) markFirstResponseByteLocked() {
+	if r.ttftSet || r.ttftStart.IsZero() {
 		return
 	}
-	r.setTTFT(time.Since(start))
+	r.ttft = r.now().Sub(r.ttftStart)
+	if r.ttft < 0 {
+		r.ttft = 0
+	}
+	r.ttftSet = true
+	r.ttftStart = time.Time{}
 }
 
 func (r *UsageReporter) buildAdditionalModelRecord(model string, detail usage.Detail) (usage.Record, bool) {
@@ -271,6 +299,7 @@ func (r *UsageReporter) buildRecordForModel(model string, detail usage.Detail, f
 		Generate:            usage.GenerateFlag(r.generate),
 		RequestedAt:         r.requestedAt,
 		Latency:             r.latency(),
+		UpstreamLatency:     r.upstreamLatency(),
 		TTFT:                r.ttftDuration(),
 		Failed:              failed,
 		Fail:                fail,
@@ -306,24 +335,6 @@ func (r *UsageReporter) latency() time.Duration {
 	return latency
 }
 
-func (r *UsageReporter) setTTFT(ttft time.Duration) {
-	if r == nil {
-		return
-	}
-	if ttft < 0 {
-		ttft = 0
-	}
-	r.ttftMu.Lock()
-	if r.ttftSet {
-		r.ttftMu.Unlock()
-		return
-	}
-	r.ttft = ttft
-	r.ttftSet = true
-	r.ttftStart = time.Time{}
-	r.ttftMu.Unlock()
-}
-
 func (r *UsageReporter) ttftDuration() time.Duration {
 	if r == nil {
 		return 0
@@ -333,25 +344,89 @@ func (r *UsageReporter) ttftDuration() time.Duration {
 	return r.ttft
 }
 
+func (r *UsageReporter) now() time.Time {
+	if r.clock != nil {
+		return r.clock()
+	}
+	return time.Now()
+}
+
+// Each HTTP attempt owns its start and body completion. Retried attempts must
+// not inherit a failed attempt's wait or allow its old body to stop the new one.
+func (r *UsageReporter) startHTTPAttempt() uint64 {
+	r.ttftMu.Lock()
+	defer r.ttftMu.Unlock()
+	r.upstreamAttempt++
+	r.upstreamStart = r.now()
+	r.upstreamEnd = time.Time{}
+	r.ttftStart = r.upstreamStart
+	r.ttft = 0
+	r.ttftSet = false
+	return r.upstreamAttempt
+}
+
+func (r *UsageReporter) finishUpstreamAttempt(attempt uint64) {
+	r.ttftMu.Lock()
+	if attempt == r.upstreamAttempt && !r.upstreamStart.IsZero() && r.upstreamEnd.IsZero() {
+		r.upstreamEnd = r.now()
+	}
+	r.ttftMu.Unlock()
+}
+
+func (r *UsageReporter) upstreamLatency() time.Duration {
+	if r == nil {
+		return 0
+	}
+	r.ttftMu.RLock()
+	defer r.ttftMu.RUnlock()
+	if r.upstreamStart.IsZero() {
+		return 0
+	}
+	end := r.upstreamEnd
+	if end.IsZero() {
+		end = r.now()
+	}
+	duration := end.Sub(r.upstreamStart)
+	if duration < 0 {
+		return 0
+	}
+	return duration
+}
+
 type usageTTFTRoundTripper struct {
 	base     http.RoundTripper
 	reporter *UsageReporter
 }
 
 func (t usageTTFTRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	t.reporter.StartResponseTTFT()
+	attempt := t.reporter.startHTTPAttempt()
 	resp, errRoundTrip := t.base.RoundTrip(req)
 	if errRoundTrip != nil {
+		t.reporter.finishUpstreamAttempt(attempt)
 		return resp, errRoundTrip
 	}
-	t.reporter.ObserveResponse(resp)
+	t.reporter.observeResponseAttempt(resp, attempt)
 	return resp, nil
 }
 
 type usageTTFTReadCloser struct {
 	io.ReadCloser
-	once sync.Once
-	mark func()
+	once     sync.Once
+	endOnce  sync.Once
+	reporter *UsageReporter
+	attempt  uint64
+}
+
+func (r *usageTTFTReadCloser) markFirstByte() {
+	r.reporter.ttftMu.Lock()
+	if r.attempt == r.reporter.upstreamAttempt {
+		r.reporter.markFirstResponseByteLocked()
+	}
+	r.reporter.ttftMu.Unlock()
+}
+
+func (r *usageTTFTReadCloser) finish() {
+	r.reporter.finishUpstreamAttempt(r.attempt)
 }
 
 func (r *usageTTFTReadCloser) Read(p []byte) (int, error) {
@@ -359,8 +434,11 @@ func (r *usageTTFTReadCloser) Read(p []byte) (int, error) {
 		return 0, io.ErrClosedPipe
 	}
 	n, errRead := r.ReadCloser.Read(p)
-	if n > 0 && r.mark != nil {
-		r.once.Do(r.mark)
+	if n > 0 {
+		r.once.Do(r.markFirstByte)
+	}
+	if errRead == io.EOF {
+		r.endOnce.Do(r.finish)
 	}
 	return n, errRead
 }

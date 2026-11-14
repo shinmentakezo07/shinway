@@ -15,6 +15,7 @@ export interface UsageSummary {
   total_tokens: number;
   avg_latency_ms: number;
   avg_ttft_ms: number;
+  avg_tps: number | null;
   unique_models: number;
   unique_api_keys: number;
   unique_auth_files: number;
@@ -73,6 +74,10 @@ export interface UsageRecord {
   UserAgent: string;
   LatencyMs: number;
   TTFtMs: number;
+  TPS: number | null;
+  TPSBasis: 'upstream' | 'end-to-end' | '';
+  LatencyNs: number;
+  UpstreamLatencyNs: number;
   Failed: boolean;
   Generate: boolean;
   FailStatus: number;

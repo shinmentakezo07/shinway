@@ -76,6 +76,8 @@ func (w *PostgresWriter) ensureTable() error {
 		client_ip TEXT NOT NULL DEFAULT '',
 		user_agent TEXT NOT NULL DEFAULT '',
 		latency_ms BIGINT NOT NULL DEFAULT 0,
+		latency_ns BIGINT NOT NULL DEFAULT 0,
+		upstream_latency_ns BIGINT NOT NULL DEFAULT 0,
 		ttft_ms BIGINT NOT NULL DEFAULT 0,
 		failed SMALLINT NOT NULL DEFAULT 0,
 		generate SMALLINT NOT NULL DEFAULT 1,
@@ -91,6 +93,11 @@ func (w *PostgresWriter) ensureTable() error {
 	)`
 	if _, err := w.db.Exec(sql); err != nil {
 		return fmt.Errorf("postgreswriter: create table: %w", err)
+	}
+	for _, name := range []string{"latency_ns", "upstream_latency_ns"} {
+		if _, err := w.db.Exec(`ALTER TABLE ` + w.table + ` ADD COLUMN IF NOT EXISTS ` + name + ` BIGINT NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("postgreswriter: add %s: %w", name, err)
+		}
 	}
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_usage_records_ts ON ` + w.table + `(ts DESC)`,
@@ -128,15 +135,15 @@ func (w *PostgresWriter) Write(ctx context.Context, r Record) error {
 			auth_type, auth_id, auth_index, api_key, source,
 			reasoning_effort, service_tier, response_service_tier,
 			client_ip, user_agent,
-			latency_ms, ttft_ms, failed, generate, fail_status, fail_body,
+			latency_ms, latency_ns, upstream_latency_ns, ttft_ms, failed, generate, fail_status, fail_body,
 			input_tokens, output_tokens, reasoning_tokens, cached_tokens,
 			cache_read_tokens, cache_creation_tokens, total_tokens
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
 		r.TS.UnixMilli(), r.RequestID, r.Provider, r.ExecutorType, r.Model, r.Alias, r.Endpoint,
 		r.AuthType, r.AuthID, r.AuthIndex, r.APIKey, r.Source,
 		r.ReasoningEffort, r.ServiceTier, r.ResponseServiceTier,
 		r.ClientIP, r.UserAgent,
-		r.LatencyMs, r.TTFtMs, failed, generate, r.FailStatus, truncate(r.FailBody, 4096),
+		r.LatencyMs, r.LatencyNs, r.UpstreamLatencyNs, r.TTFtMs, failed, generate, r.FailStatus, truncate(r.FailBody, 4096),
 		r.InputTokens, r.OutputTokens, r.ReasoningTokens, r.CachedTokens,
 		r.CacheReadTokens, r.CacheCreationTokens, r.TotalTokens,
 	)

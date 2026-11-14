@@ -151,6 +151,9 @@ redis-usage-queue-retention-seconds: 60
 # ─────────────────────────────────────────────────────────────────────
 # Every upstream request is recorded with provider, model, alias, endpoint,
 # API key, auth file, input/output/reasoning/cache tokens, latency and TTFT.
+# TPS uses nanosecond upstream execution timing when available, otherwise full
+# request timing (legacy rows retain millisecond estimates). Includes network
+# and first-byte wait; this is not decode-only speed. Schema upgrades keep history.
 # Location:  <working-dir>/db/usage.db     (WAL-mode SQLite, CGO-free)
 #            NOTE: the database file lives in the server's working directory,
 #            NOT in auth-dir. Running the server from a different directory

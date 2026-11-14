@@ -59,6 +59,7 @@ func (w *JSONWriter) Write(_ context.Context, r Record) error {
 	if w.file == nil {
 		return fmt.Errorf("jsonwriter: closed")
 	}
+	r.deriveTPS()
 	return w.enc.Encode(r)
 }
 

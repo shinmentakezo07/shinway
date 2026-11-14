@@ -163,3 +163,170 @@ func TestGetUsageStatsNoStore(t *testing.T) {
 		t.Errorf("status=%d, want 503", w.Code)
 	}
 }
+
+func TestUsageTPSJSON(t *testing.T) {
+	setupUsageStore(t)
+	from := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	to := from.Add(time.Hour)
+	for i, record := range []usagestore.Record{
+		{RequestID: "slow", Generate: true, OutputTokens: 10, LatencyMs: 1000, TTFtMs: 900},
+		{RequestID: "fast", Generate: true, OutputTokens: 90, LatencyMs: 3000},
+		{RequestID: "failed", Generate: true, Failed: true, OutputTokens: 1000, LatencyMs: 1000},
+		{RequestID: "non-generation", OutputTokens: 1000, LatencyMs: 1000},
+		{RequestID: "zero-output", Generate: true, LatencyMs: 1000},
+		{RequestID: "zero-latency", Generate: true, OutputTokens: 1000},
+	} {
+		record.TS = from.Add(time.Duration(i) * time.Minute)
+		if err := usagestore.Default().Insert(context.Background(), record); err != nil {
+			t.Fatalf("Insert: %v", err)
+		}
+	}
+	gin.SetMode(gin.TestMode)
+	h := NewHandlerWithoutConfigFilePath(nil, nil)
+	r := gin.New()
+	r.GET("/stats", h.GetUsageStats)
+	r.GET("/records", h.GetUsageRecords)
+	query := "?from=" + strconv.FormatInt(from.UnixMilli(), 10) + "&to=" + strconv.FormatInt(to.UnixMilli(), 10)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/records"+query, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("records status=%d body=%s", w.Code, w.Body.String())
+	}
+	var payload struct {
+		Records []map[string]json.RawMessage `json:"records"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode records: %v", err)
+	}
+	if len(payload.Records) != 6 {
+		t.Fatalf("records len=%d, want 6", len(payload.Records))
+	}
+	for _, record := range payload.Records {
+		var requestID string
+		if err := json.Unmarshal(record["RequestID"], &requestID); err != nil {
+			t.Fatalf("decode request ID: %v", err)
+		}
+		tps, exists := record["TPS"]
+		if !exists {
+			t.Errorf("%s missing TPS key", requestID)
+			continue
+		}
+		want := "null"
+		switch requestID {
+		case "slow":
+			want = "10"
+		case "fast":
+			want = "30"
+		}
+		if string(tps) != want {
+			t.Errorf("%s TPS=%s, want %s", requestID, tps, want)
+		}
+	}
+	for _, tt := range []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{name: "full range", query: query + "&limit=1", want: "20"},
+		{name: "invalid-only range", query: "?from=" + strconv.FormatInt(from.Add(2*time.Minute).UnixMilli(), 10) + "&to=" + strconv.FormatInt(to.UnixMilli(), 10), want: "null"},
+		{name: "empty range", query: "?from=" + strconv.FormatInt(to.UnixMilli(), 10), want: "null"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/stats"+tt.query, nil))
+			if w.Code != http.StatusOK {
+				t.Fatalf("stats status=%d body=%s", w.Code, w.Body.String())
+			}
+			var payload struct {
+				Summary map[string]json.RawMessage `json:"summary"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode summary: %v", err)
+			}
+			avgTPS, exists := payload.Summary["avg_tps"]
+			if !exists || string(avgTPS) != tt.want {
+				t.Errorf("avg_tps=%s exists=%v, want %s", avgTPS, exists, tt.want)
+			}
+		})
+	}
+}
+
+func TestUsagePreciseTPSJSON(t *testing.T) {
+	setupUsageStore(t)
+	from := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	for i, record := range []usagestore.Record{
+		{RequestID: "upstream", Generate: true, OutputTokens: 2, LatencyMs: 4000, LatencyNs: 4000000000, UpstreamLatencyNs: 250000},
+		{RequestID: "precise-local", Generate: true, OutputTokens: 1, LatencyNs: 500000},
+		{RequestID: "legacy-local", Generate: true, OutputTokens: 6, LatencyMs: 3000},
+		{RequestID: "unavailable", Generate: true, Failed: true, OutputTokens: 2, UpstreamLatencyNs: 250000},
+	} {
+		record.TS = from.Add(time.Duration(i) * time.Minute)
+		if err := usagestore.Default().Insert(context.Background(), record); err != nil {
+			t.Fatalf("Insert: %v", err)
+		}
+	}
+	gin.SetMode(gin.TestMode)
+	h := NewHandlerWithoutConfigFilePath(nil, nil)
+	r := gin.New()
+	r.GET("/stats", h.GetUsageStats)
+	r.GET("/records", h.GetUsageRecords)
+	query := "?from=" + strconv.FormatInt(from.UnixMilli(), 10) + "&to=" + strconv.FormatInt(from.Add(time.Hour).UnixMilli(), 10)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/records"+query, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("records status=%d body=%s", w.Code, w.Body.String())
+	}
+	var payload struct {
+		Records []map[string]json.RawMessage `json:"records"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode records: %v", err)
+	}
+	if len(payload.Records) != 4 {
+		t.Fatalf("records len=%d, want 4", len(payload.Records))
+	}
+	for _, record := range payload.Records {
+		var requestID, basis string
+		if err := json.Unmarshal(record["RequestID"], &requestID); err != nil {
+			t.Fatalf("decode request ID: %v", err)
+		}
+		if err := json.Unmarshal(record["TPSBasis"], &basis); err != nil {
+			t.Fatalf("decode TPS basis: %v", err)
+		}
+		wantTPS, wantBasis := "null", ""
+		switch requestID {
+		case "upstream":
+			wantTPS, wantBasis = "8000", "upstream"
+			if string(record["LatencyNs"]) != "4000000000" || string(record["UpstreamLatencyNs"]) != "250000" || string(record["LatencyMs"]) != "4000" {
+				t.Errorf("upstream latency JSON=%v", record)
+			}
+		case "precise-local":
+			wantTPS, wantBasis = "2000", "end-to-end"
+			if string(record["LatencyNs"]) != "500000" || string(record["LatencyMs"]) != "0" {
+				t.Errorf("precise latency JSON=%v", record)
+			}
+		case "legacy-local":
+			wantTPS, wantBasis = "2", "end-to-end"
+		}
+		if string(record["TPS"]) != wantTPS || basis != wantBasis {
+			t.Errorf("%s TPS=%s basis=%q, want %s/%q", requestID, record["TPS"], basis, wantTPS, wantBasis)
+		}
+	}
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/stats"+query, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("stats status=%d body=%s", w.Code, w.Body.String())
+	}
+	var stats struct {
+		Summary struct {
+			AvgTPS *float64 `json:"avg_tps"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("decode stats: %v", err)
+	}
+	if stats.Summary.AvgTPS == nil || *stats.Summary.AvgTPS != 3334 {
+		t.Errorf("avg_tps=%v, want 3334", stats.Summary.AvgTPS)
+	}
+}

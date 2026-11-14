@@ -1334,6 +1334,9 @@ type UsageRecord struct {
 	RequestedAt time.Time
 	// Latency is the total request latency.
 	Latency time.Duration
+	// UpstreamLatency measures upstream execution through body EOF, or publication
+	// while the response is active. Zero means timing is unavailable; this is not decode-only latency.
+	UpstreamLatency time.Duration
 	// TTFT is the time to first token for streaming requests.
 	TTFT time.Duration
 	// Failed reports whether the request failed.

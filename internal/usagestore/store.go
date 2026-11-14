@@ -23,7 +23,7 @@ import (
 
 const (
 	defaultDBFileName = "usage.db"
-	schemaVersion     = 1
+	schemaVersion     = 2
 )
 
 var (
@@ -258,6 +258,8 @@ func (s *Store) migrate() error {
 			client_ip TEXT NOT NULL DEFAULT '',
 			user_agent TEXT NOT NULL DEFAULT '',
 			latency_ms INTEGER NOT NULL DEFAULT 0,
+			latency_ns INTEGER NOT NULL DEFAULT 0,
+			upstream_latency_ns INTEGER NOT NULL DEFAULT 0,
 			ttft_ms INTEGER NOT NULL DEFAULT 0,
 			failed INTEGER NOT NULL DEFAULT 0,
 			generate INTEGER NOT NULL DEFAULT 1,
@@ -276,12 +278,44 @@ func (s *Store) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_requests_provider_ts ON requests(provider, ts DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_requests_apikey_ts ON requests(api_key, ts DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_requests_failed_ts ON requests(failed, ts DESC)`,
-		fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion),
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return fmt.Errorf("usagestore: migrate: %w", err)
 		}
+	}
+	rows, err := s.db.Query(`PRAGMA table_info(requests)`)
+	if err != nil {
+		return fmt.Errorf("usagestore: table info: %w", err)
+	}
+	columns := make(map[string]bool)
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, columnType string
+		var defaultValue sql.NullString
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("usagestore: table info: %w", err)
+		}
+		columns[name] = true
+	}
+	err = rows.Err()
+	closeErr := rows.Close()
+	if err != nil {
+		return fmt.Errorf("usagestore: table info: %w", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("usagestore: table info: %w", closeErr)
+	}
+	for _, name := range []string{"latency_ns", "upstream_latency_ns"} {
+		if !columns[name] {
+			if _, err := s.db.Exec(`ALTER TABLE requests ADD COLUMN ` + name + ` INTEGER NOT NULL DEFAULT 0`); err != nil {
+				return fmt.Errorf("usagestore: add %s: %w", name, err)
+			}
+		}
+	}
+	if _, err := s.db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion)); err != nil {
+		return fmt.Errorf("usagestore: schema version: %w", err)
 	}
 	return nil
 }
@@ -306,7 +340,11 @@ type Record struct {
 	ClientIP            string
 	UserAgent           string
 	LatencyMs           int64
+	LatencyNs           int64
+	UpstreamLatencyNs   int64
 	TTFtMs              int64
+	TPS                 *float64 // Output tokens per second, derived from the best available duration; nil when unavailable.
+	TPSBasis            string   // "upstream", "end-to-end", or empty when TPS is unavailable.
 	Failed              bool
 	Generate            bool
 	FailStatus          int
@@ -318,6 +356,34 @@ type Record struct {
 	CacheReadTokens     int64
 	CacheCreationTokens int64
 	TotalTokens         int64
+}
+
+// tpsDurationSQL mirrors deriveTPS's duration hierarchy. The floating-point
+// multiplier keeps legacy millisecond durations from overflowing an integer.
+const tpsDurationSQL = `CASE WHEN upstream_latency_ns > 0 THEN upstream_latency_ns
+	WHEN latency_ns > 0 THEN latency_ns ELSE latency_ms * 1000000.0 END`
+
+func (r *Record) deriveTPS() {
+	r.TPS = nil
+	r.TPSBasis = ""
+	if r.Failed || !r.Generate || r.OutputTokens <= 0 {
+		return
+	}
+	durationNs := float64(r.UpstreamLatencyNs)
+	basis := "upstream"
+	if durationNs <= 0 {
+		basis = "end-to-end"
+		durationNs = float64(r.LatencyNs)
+		if durationNs <= 0 {
+			durationNs = float64(r.LatencyMs) * 1e6
+		}
+	}
+	if durationNs <= 0 {
+		return
+	}
+	tps := float64(r.OutputTokens) * 1e9 / durationNs
+	r.TPS = &tps
+	r.TPSBasis = basis
 }
 
 // Insert appends a usage record. It is safe for concurrent use.
@@ -348,15 +414,15 @@ func (s *Store) Insert(ctx context.Context, r Record) error {
 		auth_type, auth_id, auth_index, api_key, source,
 		reasoning_effort, service_tier, response_service_tier,
 		client_ip, user_agent,
-		latency_ms, ttft_ms, failed, generate, fail_status, fail_body,
+		latency_ms, latency_ns, upstream_latency_ns, ttft_ms, failed, generate, fail_status, fail_body,
 		input_tokens, output_tokens, reasoning_tokens, cached_tokens,
 		cache_read_tokens, cache_creation_tokens, total_tokens
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		r.TS.UnixMilli(), r.RequestID, r.Provider, r.ExecutorType, r.Model, r.Alias, r.Endpoint,
 		r.AuthType, r.AuthID, r.AuthIndex, r.APIKey, r.Source,
 		r.ReasoningEffort, r.ServiceTier, r.ResponseServiceTier,
 		r.ClientIP, r.UserAgent,
-		r.LatencyMs, r.TTFtMs, failed, generate, r.FailStatus, truncate(r.FailBody, 4096),
+		r.LatencyMs, r.LatencyNs, r.UpstreamLatencyNs, r.TTFtMs, failed, generate, r.FailStatus, truncate(r.FailBody, 4096),
 		r.InputTokens, r.OutputTokens, r.ReasoningTokens, r.CachedTokens,
 		r.CacheReadTokens, r.CacheCreationTokens, r.TotalTokens,
 	)
@@ -400,6 +466,7 @@ type Summary struct {
 	TotalTokens     int64     `json:"total_tokens"`
 	AvgLatencyMs    float64   `json:"avg_latency_ms"`
 	AvgTTFtMs       float64   `json:"avg_ttft_ms"`
+	AvgTPS          *float64  `json:"avg_tps"`
 	UniqueModels    int64     `json:"unique_models"`
 	UniqueAPIKeys   int64     `json:"unique_api_keys"`
 	UniqueAuthFiles int64     `json:"unique_auth_files"`
@@ -424,6 +491,8 @@ func (s *Store) Summary(ctx context.Context, from, to time.Time) (Summary, error
 			COALESCE(SUM(total_tokens), 0),
 			COALESCE(AVG(latency_ms), 0),
 			COALESCE(AVG(ttft_ms), 0),
+			AVG(CASE WHEN failed = 0 AND generate = 1 AND output_tokens > 0 AND (`+tpsDurationSQL+`) > 0
+				THEN output_tokens * 1000000000.0 / (`+tpsDurationSQL+`) END),
 			COUNT(DISTINCT NULLIF(model, '')),
 			COUNT(DISTINCT NULLIF(api_key, '')),
 			COUNT(DISTINCT NULLIF(auth_id, ''))
@@ -431,7 +500,7 @@ func (s *Store) Summary(ctx context.Context, from, to time.Time) (Summary, error
 	err := row.Scan(
 		&out.TotalRequests, &out.FailedRequests,
 		&out.TotalInput, &out.TotalOutput, &out.TotalReasoning, &out.TotalCached, &out.TotalTokens,
-		&out.AvgLatencyMs, &out.AvgTTFtMs,
+		&out.AvgLatencyMs, &out.AvgTTFtMs, &out.AvgTPS,
 		&out.UniqueModels, &out.UniqueAPIKeys, &out.UniqueAuthFiles,
 	)
 	if err != nil {
@@ -651,7 +720,7 @@ func (s *Store) List(ctx context.Context, f ListFilter) ([]Record, int64, error)
 		auth_type, auth_id, auth_index, api_key, source,
 		reasoning_effort, service_tier, response_service_tier,
 		client_ip, user_agent,
-		latency_ms, ttft_ms, failed, generate, fail_status, fail_body,
+		latency_ms, latency_ns, upstream_latency_ns, ttft_ms, failed, generate, fail_status, fail_body,
 		input_tokens, output_tokens, reasoning_tokens, cached_tokens,
 		cache_read_tokens, cache_creation_tokens, total_tokens
 	FROM requests ` + whereSQL + ` ORDER BY ts DESC LIMIT ? OFFSET ?`
@@ -673,7 +742,7 @@ func (s *Store) List(ctx context.Context, f ListFilter) ([]Record, int64, error)
 			&r.AuthType, &r.AuthID, &r.AuthIndex, &r.APIKey, &r.Source,
 			&r.ReasoningEffort, &r.ServiceTier, &r.ResponseServiceTier,
 			&r.ClientIP, &r.UserAgent,
-			&r.LatencyMs, &r.TTFtMs, &failed, &generate, &r.FailStatus, &r.FailBody,
+			&r.LatencyMs, &r.LatencyNs, &r.UpstreamLatencyNs, &r.TTFtMs, &failed, &generate, &r.FailStatus, &r.FailBody,
 			&r.InputTokens, &r.OutputTokens, &r.ReasoningTokens, &r.CachedTokens,
 			&r.CacheReadTokens, &r.CacheCreationTokens, &r.TotalTokens,
 		)
@@ -683,6 +752,7 @@ func (s *Store) List(ctx context.Context, f ListFilter) ([]Record, int64, error)
 		r.TS = time.UnixMilli(ts).UTC()
 		r.Failed = failed == 1
 		r.Generate = generate == 1
+		r.deriveTPS()
 		out = append(out, r)
 	}
 	return out, total, rows.Err()
@@ -770,6 +840,8 @@ func (r *recorder) HandleUsage(ctx context.Context, rec coreusage.Record) {
 		ClientIP:            clientMeta.ClientIP,
 		UserAgent:           clientMeta.UserAgent,
 		LatencyMs:           rec.Latency.Milliseconds(),
+		LatencyNs:           rec.Latency.Nanoseconds(),
+		UpstreamLatencyNs:   rec.UpstreamLatency.Nanoseconds(),
 		TTFtMs:              rec.TTFT.Milliseconds(),
 		Failed:              failed,
 		Generate:            coreusage.GenerateEnabled(rec.Generate),
